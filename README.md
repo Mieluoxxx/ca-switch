@@ -1,4 +1,4 @@
-# SiriusX CC CLI
+# SiriusX Coding Agent Switch
 
 多 AI 编程助手配置管理工具
 
@@ -19,17 +19,17 @@ cargo install --path .
 
 ```bash
 # 交互式菜单
-cc
+ca-switch
 
 # 配置管理
-cc api      # Claude
-cc codex    # Codex
-cc gemini   # Gemini
-cc opencode # OpenCode
+ca-switch api      # Claude
+ca-switch codex    # Codex
+ca-switch gemini   # Gemini
+ca-switch opencode # OpenCode
 
 # 其他
-cc backup   # 备份恢复
-cc status   # 查看状态
+ca-switch backup   # 备份恢复
+ca-switch status   # 查看状态
 ```
 
 ## 功能
