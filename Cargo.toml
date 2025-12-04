@@ -1,0 +1,52 @@
+[package]
+name = "ca-switch"
+version = "0.1.0"
+edition = "2021"
+description = "Coding Agent配置管理CLI工具"
+authors = ["moguw <weiyiding0@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/Mieluoxxx/ca-switch.git"
+homepage = "https://github.com/Mieluoxxx/ca-switch#readme"
+keywords = ["claude-code", "codex", "gemini-cli", "opencode"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "ca-switch"
+path = "src/main.rs"
+
+[dependencies]
+# CLI framework
+clap = { version = "4.5", features = ["derive", "cargo"] }
+
+# 交互式界面
+dialoguer = "0.11"
+console = "0.15"
+indicatif = "0.17"
+
+# 异步运行时
+tokio = { version = "1.41", features = ["full"] }
+
+# HTTP 客户端 (WebDAV)
+reqwest = { version = "0.12", features = ["json", "stream"] }
+base64 = "0.22"  # Base64 编码（用于 WebDAV 认证）
+
+# 序列化
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# 错误处理
+anyhow = "1.0"
+thiserror = "2.0"
+
+# 系统路径
+dirs = "5.0"
+
+# 文件操作
+fs_extra = "1.3"
+
+# 其他工具
+chrono = "0.4"
+toml = "0.8"        # TOML 配置文件处理
+opener = "0.7"      # 打开文件/URL
+url = "2.5"         # URL 解析和验证
+hostname = "0.4"    # 获取主机名
