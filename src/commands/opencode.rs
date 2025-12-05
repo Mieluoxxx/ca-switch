@@ -23,8 +23,8 @@ impl OpenCodeCommand {
     /// 执行命令
     pub fn execute(&mut self) -> Result<(), String> {
         loop {
-            let choice = crate::ui::show_api_menu("🚀 OpenCode配置管理")
-                .map_err(|e| e.to_string())?;
+            let choice =
+                crate::ui::show_api_menu("🚀 OpenCode配置管理").map_err(|e| e.to_string())?;
 
             use crate::ui::style::ApiMenuChoice;
             match choice {
@@ -85,27 +85,45 @@ impl OpenCodeCommand {
         }
 
         // ===== 第1步：选择主模型 =====
-        println!("{}", style("📝 第1步: 选择主模型 (复杂任务使用)").white().bold());
-        let (main_provider, main_model) =
-            self.select_model(&all_providers, "主模型")?;
+        println!(
+            "{}",
+            style("📝 第1步: 选择主模型 (复杂任务使用)").white().bold()
+        );
+        let (main_provider, main_model) = self.select_model(&all_providers, "主模型")?;
 
         // ===== 第2步：选择轻量模型 =====
-        println!("\n{}", style("📝 第2步: 选择轻量模型 (简单任务使用)").white().bold());
-        let (small_provider, small_model) =
-            self.select_model(&all_providers, "轻量模型")?;
+        println!(
+            "\n{}",
+            style("📝 第2步: 选择轻量模型 (简单任务使用)")
+                .white()
+                .bold()
+        );
+        let (small_provider, small_model) = self.select_model(&all_providers, "轻量模型")?;
 
         // ===== 第3步：确认配置 =====
         println!("\n{}", style("📋 配置预览：").white().bold());
         println!();
 
         println!("{}", style("主模型配置:").green());
-        println!("  {} {}", style("Provider:").white(), style(&main_provider).cyan());
+        println!(
+            "  {} {}",
+            style("Provider:").white(),
+            style(&main_provider).cyan()
+        );
         println!("  {} {}", style("模型:").white(), style(&main_model).cyan());
 
         println!();
         println!("{}", style("轻量模型配置:").green());
-        println!("  {} {}", style("Provider:").white(), style(&small_provider).cyan());
-        println!("  {} {}", style("模型:").white(), style(&small_model).cyan());
+        println!(
+            "  {} {}",
+            style("Provider:").white(),
+            style(&small_provider).cyan()
+        );
+        println!(
+            "  {} {}",
+            style("模型:").white(),
+            style(&small_model).cyan()
+        );
         println!();
 
         if !self.confirm("确认切换配置", true)? {
@@ -206,15 +224,39 @@ impl OpenCodeCommand {
             println!();
 
             println!("{}", style("主模型配置:").white().bold());
-            println!("  {} {}", style("Provider:").white(), style(&active.main.provider).cyan());
-            println!("  {} {}", style("Base URL:").white(), style(&active.main.base_url).dim());
-            println!("  {} {}", style("模型:").white(), style(&active.main.model).cyan());
+            println!(
+                "  {} {}",
+                style("Provider:").white(),
+                style(&active.main.provider).cyan()
+            );
+            println!(
+                "  {} {}",
+                style("Base URL:").white(),
+                style(&active.main.base_url).dim()
+            );
+            println!(
+                "  {} {}",
+                style("模型:").white(),
+                style(&active.main.model).cyan()
+            );
             println!();
 
             println!("{}", style("轻量模型配置:").white().bold());
-            println!("  {} {}", style("Provider:").white(), style(&active.small.provider).cyan());
-            println!("  {} {}", style("Base URL:").white(), style(&active.small.base_url).dim());
-            println!("  {} {}", style("模型:").white(), style(&active.small.model).cyan());
+            println!(
+                "  {} {}",
+                style("Provider:").white(),
+                style(&active.small.provider).cyan()
+            );
+            println!(
+                "  {} {}",
+                style("Base URL:").white(),
+                style(&active.small.base_url).dim()
+            );
+            println!(
+                "  {} {}",
+                style("模型:").white(),
+                style(&active.small.model).cyan()
+            );
             println!();
         } else {
             show_info("当前没有激活的 OpenCode 配置");
@@ -231,8 +273,16 @@ impl OpenCodeCommand {
 
             for (provider_name, provider) in &all_providers {
                 println!();
-                println!("  {} {}", style("Provider:").white(), style(provider_name).cyan());
-                println!("  {} {}", style("Base URL:").white(), style(&provider.options.base_url).dim());
+                println!(
+                    "  {} {}",
+                    style("Provider:").white(),
+                    style(provider_name).cyan()
+                );
+                println!(
+                    "  {} {}",
+                    style("Base URL:").white(),
+                    style(&provider.options.base_url).dim()
+                );
 
                 if let Some(ref npm) = provider.npm {
                     println!("  {} {}", style("NPM:").white(), style(npm).dim());
@@ -243,7 +293,11 @@ impl OpenCodeCommand {
                 }
 
                 let model_list: Vec<&str> = provider.models.keys().map(|s| s.as_str()).collect();
-                println!("  {} {}", style("可用模型:").white(), style(model_list.join(", ")).yellow());
+                println!(
+                    "  {} {}",
+                    style("可用模型:").white(),
+                    style(model_list.join(", ")).yellow()
+                );
             }
         }
 
@@ -350,12 +404,16 @@ impl OpenCodeCommand {
         };
 
         // 添加 Provider
-        self.config_manager
-            .opencode_mut()
-            .add_provider(provider_name.clone(), base_url, api_key, npm, description)?;
+        self.config_manager.opencode_mut().add_provider(
+            provider_name.clone(),
+            base_url,
+            api_key,
+            npm,
+            description,
+        )?;
 
         show_success(&format!("✅ Provider '{}' 添加成功！", provider_name));
-        show_info("接下来请添加模型");
+        show_info("接下来请前往编辑配置中添加模型");
 
         self.wait_for_back();
 
@@ -364,9 +422,6 @@ impl OpenCodeCommand {
 
     /// 向已有 Provider 添加模型(交互式)
     fn add_model_to_provider_interactive(&mut self) -> Result<(), String> {
-        println!("\n{}", style("🤖 添加模型").cyan().bold());
-        println!();
-
         // 选择 Provider
         let all_providers = self.config_manager.opencode().get_all_providers()?;
 
@@ -378,7 +433,25 @@ impl OpenCodeCommand {
 
         let provider_name = self.select_provider(&all_providers)?;
 
-        self.add_model_to_provider(&provider_name)?;
+        // 循环添加模型，允许用户连续添加多个模型到同一个 Provider
+        loop {
+            println!("\n{}", style("🤖 添加模型").cyan().bold());
+            println!();
+
+            let choices = vec!["➕ 添加新模型", "⬅️  返回上一级菜单"];
+
+            let selection = Select::with_theme(&ColorfulTheme::default())
+                .with_prompt("请选择操作")
+                .items(&choices)
+                .default(0)
+                .interact()
+                .map_err(|_| "用户取消操作")?;
+
+            match selection {
+                0 => self.add_model_to_provider(&provider_name)?,
+                _ => break,
+            }
+        }
 
         Ok(())
     }
@@ -415,11 +488,7 @@ impl OpenCodeCommand {
         let context_limit = if context_limit_str.is_empty() {
             None
         } else {
-            Some(
-                context_limit_str
-                    .parse::<u64>()
-                    .map_err(|_| "无效的数字")?,
-            )
+            Some(context_limit_str.parse::<u64>().map_err(|_| "无效的数字")?)
         };
 
         // Output Limit
@@ -450,16 +519,16 @@ impl OpenCodeCommand {
             limit,
         };
 
-        self.config_manager
-            .opencode_mut()
-            .add_model(provider_name, model_id.clone(), model_info)?;
+        self.config_manager.opencode_mut().add_model(
+            provider_name,
+            model_id.clone(),
+            model_info,
+        )?;
 
         show_success(&format!(
             "✅ 模型 '{}' 已添加到 Provider '{}'",
             model_id, provider_name
         ));
-
-        self.wait_for_back();
 
         Ok(())
     }
@@ -561,13 +630,15 @@ impl OpenCodeCommand {
             Some(new_description)
         };
 
-        self.config_manager.opencode_mut().update_provider_metadata(
-            provider_name,
-            Some(new_base_url),
-            new_api_key,
-            new_npm,
-            new_description,
-        )?;
+        self.config_manager
+            .opencode_mut()
+            .update_provider_metadata(
+                provider_name,
+                Some(new_base_url),
+                new_api_key,
+                new_npm,
+                new_description,
+            )?;
 
         show_success(&format!("✅ Provider '{}' 元数据已更新", provider_name));
 
@@ -578,26 +649,24 @@ impl OpenCodeCommand {
 
     /// 管理模型
     fn edit_models(&mut self, provider_name: &str) -> Result<(), String> {
-        println!("\n{}", style("🤖 管理模型").cyan().bold());
-        println!();
+        loop {
+            println!("\n{}", style("🤖 管理模型").cyan().bold());
+            println!();
 
-        let choices = vec![
-            "➕ 添加新模型",
-            "🗑️  删除模型",
-            "⬅️  返回上一级菜单",
-        ];
+            let choices = vec!["➕ 添加新模型", "🗑️  删除模型", "⬅️  返回上一级菜单"];
 
-        let selection = Select::with_theme(&ColorfulTheme::default())
-            .with_prompt("请选择操作")
-            .items(&choices)
-            .default(0)
-            .interact()
-            .map_err(|_| "用户取消操作")?;
+            let selection = Select::with_theme(&ColorfulTheme::default())
+                .with_prompt("请选择操作")
+                .items(&choices)
+                .default(0)
+                .interact()
+                .map_err(|_| "用户取消操作")?;
 
-        match selection {
-            0 => self.add_model_to_provider(provider_name)?,
-            1 => self.delete_model_from_provider(provider_name)?,
-            _ => {}
+            match selection {
+                0 => self.add_model_to_provider(provider_name)?,
+                1 => self.delete_model_from_provider(provider_name)?,
+                _ => break,
+            }
         }
 
         Ok(())
@@ -641,8 +710,6 @@ impl OpenCodeCommand {
 
         show_success(&format!("✅ 模型 '{}' 已删除", model_id));
 
-        self.wait_for_back();
-
         Ok(())
     }
 
@@ -661,7 +728,10 @@ impl OpenCodeCommand {
 
         let provider_name = self.select_provider(&all_providers)?;
 
-        println!("\n{}", style("⚠️  警告: 此操作将删除整个 Provider 及其所有配置").yellow());
+        println!(
+            "\n{}",
+            style("⚠️  警告: 此操作将删除整个 Provider 及其所有配置").yellow()
+        );
         println!();
 
         if !self.confirm(&format!("确认删除 Provider '{}'?", provider_name), false)? {

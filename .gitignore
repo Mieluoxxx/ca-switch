@@ -3,3 +3,4 @@ package.json
 bun.lock
 .claude/
 target/
+.opencode/opencode.json
