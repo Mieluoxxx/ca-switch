@@ -1,6 +1,6 @@
 [package]
 name = "ca-switch"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 description = "Coding Agent配置管理CLI工具"
 authors = ["moguw <weiyiding0@gmail.com>"]

@@ -338,7 +338,7 @@ impl OpenCodeCommand {
 
         // Provider 名称
         let provider_name: String = Input::with_theme(&ColorfulTheme::default())
-            .with_prompt("Provider 名称 (如: AutoCore, Elysia)")
+            .with_prompt("Provider 名称 (如: MyProvider, CustomAI)")
             .validate_with(|input: &String| -> Result<(), &str> {
                 if input.trim().is_empty() {
                     Err("Provider 名称不能为空")
@@ -460,7 +460,7 @@ impl OpenCodeCommand {
     fn add_model_to_provider(&mut self, provider_name: &str) -> Result<(), String> {
         // 模型 ID
         let model_id: String = Input::with_theme(&ColorfulTheme::default())
-            .with_prompt("模型 ID (如: claude-sonnet-4-5)")
+            .with_prompt("模型 ID (如: gpt-4, model-name)")
             .validate_with(|input: &String| -> Result<(), &str> {
                 if input.trim().is_empty() {
                     Err("模型 ID 不能为空")
