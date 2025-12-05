@@ -14,7 +14,7 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Some(Commands::Api) => {
+        Some(Commands::Claude) => {
             let mut cmd = commands::ClaudeCommand::new()?;
             cmd.execute()?;
         }
@@ -145,7 +145,7 @@ fn show_help() -> Result<()> {
     println!("  cc [COMMAND]");
 
     println!("\n{}", style("可用命令:").white().bold());
-    println!("  api      Claude API 配置管理");
+    println!("  claude   Claude API 配置管理");
     println!("  codex    Codex API 配置管理");
     println!("  backup   备份与恢复");
     println!("  status   查看当前状态");

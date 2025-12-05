@@ -22,7 +22,7 @@ cargo install ca-switch
 ca-switch
 
 # 配置管理
-ca-switch api      # Claude
+ca-switch claude   # Claude
 ca-switch codex    # Codex
 ca-switch gemini   # Gemini
 ca-switch opencode # OpenCode

@@ -14,7 +14,7 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     /// Claude API 配置管理
-    Api,
+    Claude,
 
     /// Codex API 配置管理
     Codex,
@@ -23,6 +23,7 @@ pub enum Commands {
     Gemini,
 
     /// OpenCode 配置管理
+    #[command(name = "opencode")]
     OpenCode,
 
     /// 备份与恢复

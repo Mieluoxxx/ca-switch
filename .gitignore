@@ -1,6 +1,5 @@
 node_modules
 package.json
 bun.lock
-.opencode/
 .claude/
 target/
