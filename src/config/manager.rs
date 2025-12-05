@@ -15,7 +15,6 @@ use std::path::PathBuf;
 
 /// 核心配置管理器
 pub struct ConfigManager {
-    config_dir: PathBuf,         // ~/.cc-cli
     global_config_file: PathBuf, // ~/.cc-cli/config.json
     claude_manager: ClaudeConfigManager,
     codex_manager: CodexConfigManager,
@@ -40,7 +39,6 @@ impl ConfigManager {
         let opencode_manager = OpenCodeConfigManager::new(config_dir.clone())?;
 
         Ok(Self {
-            config_dir,
             global_config_file,
             claude_manager,
             codex_manager,
@@ -152,14 +150,6 @@ impl ConfigManager {
         Ok(())
     }
 
-    /// 清除 Claude 激活配置
-    pub fn clear_claude_active(&mut self) -> Result<(), String> {
-        let mut global_config = self.read_global_config()?;
-        global_config.active.claude = None;
-        global_config.update_timestamp();
-        self.write_global_config(&global_config)
-    }
-
     // ========================================================================
     // Codex 配置管理
     // ========================================================================
@@ -240,14 +230,6 @@ impl ConfigManager {
         Ok(())
     }
 
-    /// 清除 Codex 激活配置
-    pub fn clear_codex_active(&mut self) -> Result<(), String> {
-        let mut global_config = self.read_global_config()?;
-        global_config.active.codex = None;
-        global_config.update_timestamp();
-        self.write_global_config(&global_config)
-    }
-
     // ========================================================================
     // Gemini 配置管理
     // ========================================================================
@@ -317,14 +299,6 @@ impl ConfigManager {
         self.gemini_manager.sync_to_gemini(&active_config)?;
 
         Ok(())
-    }
-
-    /// 清除 Gemini 激活配置
-    pub fn clear_gemini_active(&mut self) -> Result<(), String> {
-        let mut global_config = self.read_global_config()?;
-        global_config.active.gemini = None;
-        global_config.update_timestamp();
-        self.write_global_config(&global_config)
     }
 
     // ========================================================================
@@ -417,58 +391,6 @@ impl ConfigManager {
 
         Ok(())
     }
-
-    /// 清除 OpenCode 激活配置
-    pub fn clear_opencode_active(&mut self) -> Result<(), String> {
-        let mut global_config = self.read_global_config()?;
-        global_config.active.opencode = None;
-        global_config.update_timestamp();
-        self.write_global_config(&global_config)
-    }
-
-    // ========================================================================
-    // 辅助方法
-    // ========================================================================
-
-    /// 获取配置目录路径
-    pub fn get_config_dir(&self) -> &PathBuf {
-        &self.config_dir
-    }
-
-    /// 获取全局配置文件路径
-    pub fn get_global_config_file(&self) -> &PathBuf {
-        &self.global_config_file
-    }
-
-    /// 检查是否有任何配置
-    pub fn has_any_config(&self) -> Result<bool, String> {
-        let global_config = self.read_global_config()?;
-        Ok(global_config.active.claude.is_some())
-    }
-}
-
-// ============================================================================
-// 辅助函数 - 兼容旧版本
-// ============================================================================
-
-/// 查找配置路径（兼容旧版本的 ~/.claude/api_configs.json）
-pub fn find_config_path() -> Result<PathBuf, String> {
-    let home_dir = dirs::home_dir().ok_or("无法获取用户主目录")?;
-
-    // 优先使用新路径
-    let new_path = home_dir.join(".cc-cli").join("config.json");
-    if new_path.exists() {
-        return Ok(new_path);
-    }
-
-    // 兼容旧路径
-    let old_path = home_dir.join(".claude").join("api_configs.json");
-    if old_path.exists() {
-        return Ok(old_path);
-    }
-
-    // 默认返回新路径
-    Ok(new_path)
 }
 
 #[cfg(test)]

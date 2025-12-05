@@ -11,7 +11,6 @@ use std::path::PathBuf;
 
 /// OpenCode 配置管理器
 pub struct OpenCodeConfigManager {
-    config_dir: PathBuf,            // ~/.cc-cli
     opencode_config_file: PathBuf,  // ~/.cc-cli/opencode.json
     opencode_dir: PathBuf,          // ~/.opencode
     opencode_json: PathBuf,         // ~/.opencode/opencode.json
@@ -36,7 +35,6 @@ impl OpenCodeConfigManager {
         let opencode_json = opencode_dir.join("opencode.json");
 
         Ok(Self {
-            config_dir,
             opencode_config_file,
             opencode_dir,
             opencode_json,
@@ -147,37 +145,6 @@ impl OpenCodeConfigManager {
         if config.remove_provider(provider_name).is_none() {
             return Err(format!("Provider '{}' 不存在", provider_name));
         }
-
-        self.write_config(&config)
-    }
-
-    // ========================================================================
-    // API Key 管理 (OpenCode 每个 Provider 只有一个 API Key)
-    // ========================================================================
-
-    /// 获取 API Key
-    pub fn get_api_key(&self, provider_name: &str) -> Result<String, String> {
-        let config = self.read_config()?;
-        let provider = config
-            .get_provider(provider_name)
-            .ok_or_else(|| format!("Provider '{}' 不存在", provider_name))?;
-
-        Ok(provider.get_api_key().clone())
-    }
-
-    /// 更新 API Key
-    pub fn update_api_key(
-        &mut self,
-        provider_name: &str,
-        new_api_key: String,
-    ) -> Result<(), String> {
-        let mut config = self.read_config()?;
-
-        let provider = config
-            .get_provider_mut(provider_name)
-            .ok_or_else(|| format!("Provider '{}' 不存在", provider_name))?;
-
-        provider.set_api_key(new_api_key);
 
         self.write_config(&config)
     }
@@ -299,19 +266,5 @@ impl OpenCodeConfigManager {
 
         fs::write(&self.opencode_json, content)
             .map_err(|e| format!("写入 ~/.opencode/opencode.json 失败: {}", e))
-    }
-
-    // ========================================================================
-    // 辅助方法
-    // ========================================================================
-
-    /// 获取配置文件路径（用于备份等）
-    pub fn get_config_file_path(&self) -> &PathBuf {
-        &self.opencode_config_file
-    }
-
-    /// 获取 opencode.json 路径
-    pub fn get_opencode_json_path(&self) -> &PathBuf {
-        &self.opencode_json
     }
 }

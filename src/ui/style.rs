@@ -56,22 +56,18 @@ pub enum MainMenuChoice {
     GeminiApi,
     OpenCodeApi,
     Backup,
-    Status,
-    Help,
     Exit,
 }
 
 impl fmt::Display for MainMenuChoice {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            MainMenuChoice::Api => write!(f, "📡 Claude Code API - Claude配置管理"),
-            MainMenuChoice::CodexApi => write!(f, "💻 Codex API - Codex配置管理"),
-            MainMenuChoice::GeminiApi => write!(f, "🌟 Gemini API - Gemini CLI配置管理"),
-            MainMenuChoice::OpenCodeApi => write!(f, "🚀 OpenCode API - OpenCode配置管理"),
-            MainMenuChoice::Backup => write!(f, "🔄 Backup - 备份与恢复"),
-            MainMenuChoice::Status => write!(f, "📊 Status - 查看当前状态"),
-            MainMenuChoice::Help => write!(f, "❓ Help - 帮助文档"),
-            MainMenuChoice::Exit => write!(f, "🚪 Exit - 退出"),
+            MainMenuChoice::Api => write!(f, "📡 ClaudeCode"),
+            MainMenuChoice::CodexApi => write!(f, "💻 Codex"),
+            MainMenuChoice::GeminiApi => write!(f, "🌟 Gemini-cli"),
+            MainMenuChoice::OpenCodeApi => write!(f, "🚀 OpenCode"),
+            MainMenuChoice::Backup => write!(f, "🔄 Backup"),
+            MainMenuChoice::Exit => write!(f, "🚪 Exit"),
         }
     }
 }
@@ -79,13 +75,11 @@ impl fmt::Display for MainMenuChoice {
 /// 显示主菜单
 pub fn show_main_menu() -> crate::error::Result<MainMenuChoice> {
     let choices = [
+        MainMenuChoice::OpenCodeApi,
         MainMenuChoice::Api,
         MainMenuChoice::CodexApi,
         MainMenuChoice::GeminiApi,
-        MainMenuChoice::OpenCodeApi,
         MainMenuChoice::Backup,
-        MainMenuChoice::Status,
-        MainMenuChoice::Help,
         MainMenuChoice::Exit,
     ];
 
@@ -157,6 +151,7 @@ pub fn confirm(message: &str, default: bool) -> crate::error::Result<bool> {
 }
 
 /// 等待返回确认
+#[allow(dead_code)]
 pub fn wait_for_back_confirm(message: &str) -> crate::error::Result<()> {
     let items = vec!["⬅️  返回上一级菜单"];
     Select::with_theme(&ColorfulTheme::default())

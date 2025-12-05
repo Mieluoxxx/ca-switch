@@ -371,22 +371,4 @@ impl CodexConfigManager {
             .map_err(|e| format!("写入 config.toml 失败: {}", e))
     }
 
-    // ========================================================================
-    // 辅助方法
-    // ========================================================================
-
-    /// 获取配置文件路径（用于备份等）
-    pub fn get_config_file_path(&self) -> &PathBuf {
-        &self.codex_config_file
-    }
-
-    /// 获取 config.toml 路径
-    pub fn get_config_toml_path(&self) -> &PathBuf {
-        &self.codex_config_toml
-    }
-
-    /// 获取 auth.json 路径
-    pub fn get_auth_json_path(&self) -> &PathBuf {
-        &self.codex_auth_json
-    }
 }

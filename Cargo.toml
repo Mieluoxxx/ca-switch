@@ -1,6 +1,6 @@
 [package]
 name = "ca-switch"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Coding Agent配置管理CLI工具"
 authors = ["moguw <weiyiding0@gmail.com>"]
@@ -29,6 +29,7 @@ tokio = { version = "1.41", features = ["full"] }
 # HTTP 客户端 (WebDAV)
 reqwest = { version = "0.12", features = ["json", "stream"] }
 base64 = "0.22"  # Base64 编码（用于 WebDAV 认证）
+quick-xml = "0.37"  # XML 解析（用于 WebDAV 响应）
 
 # 序列化
 serde = { version = "1.0", features = ["derive"] }

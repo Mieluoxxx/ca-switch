@@ -9,11 +9,9 @@ use std::path::PathBuf;
 
 /// Gemini 配置管理器
 pub struct GeminiConfigManager {
-    config_dir: PathBuf,          // ~/.cc-cli
     gemini_config_file: PathBuf,  // ~/.cc-cli/gemini.json
     gemini_dir: PathBuf,           // ~/.gemini
     gemini_env_file: PathBuf,      // ~/.gemini/.env
-    gemini_settings_file: PathBuf, // ~/.gemini/settings.json
 }
 
 impl GeminiConfigManager {
@@ -33,14 +31,11 @@ impl GeminiConfigManager {
             .join(".gemini");
 
         let gemini_env_file = gemini_dir.join(".env");
-        let gemini_settings_file = gemini_dir.join("settings.json");
 
         Ok(Self {
-            config_dir,
             gemini_config_file,
             gemini_dir,
             gemini_env_file,
-            gemini_settings_file,
         })
     }
 
@@ -172,16 +167,6 @@ impl GeminiConfigManager {
     // API Key 管理
     // ========================================================================
 
-    /// 获取 API Keys
-    pub fn get_api_keys(&self, site_name: &str) -> Result<HashMap<String, String>, String> {
-        let config = self.read_config()?;
-        let site = config
-            .get_site(site_name)
-            .ok_or_else(|| format!("站点 '{}' 不存在", site_name))?;
-
-        Ok(site.api_keys.clone())
-    }
-
     /// 添加 API Key
     pub fn add_api_key(
         &mut self,
@@ -292,24 +277,5 @@ impl GeminiConfigManager {
 
         fs::write(&self.gemini_env_file, content)
             .map_err(|e| format!("写入 .env 失败: {}", e))
-    }
-
-    // ========================================================================
-    // 辅助方法
-    // ========================================================================
-
-    /// 获取配置文件路径（用于备份等）
-    pub fn get_config_file_path(&self) -> &PathBuf {
-        &self.gemini_config_file
-    }
-
-    /// 获取 .env 路径
-    pub fn get_env_file_path(&self) -> &PathBuf {
-        &self.gemini_env_file
-    }
-
-    /// 获取 settings.json 路径
-    pub fn get_settings_file_path(&self) -> &PathBuf {
-        &self.gemini_settings_file
     }
 }

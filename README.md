@@ -12,7 +12,7 @@
 ## 安装
 
 ```bash
-cargo install --path .
+cargo install ca-switch
 ```
 
 ## 使用
