@@ -98,9 +98,12 @@ pub fn show_main_menu() -> crate::error::Result<MainMenuChoice> {
 pub enum ApiMenuChoice {
     Switch,
     List,
+    Apply,
     Add,
     Edit,
     Delete,
+    DetectSite,
+    DetectModel,
     Back,
 }
 
@@ -109,9 +112,12 @@ impl fmt::Display for ApiMenuChoice {
         match self {
             ApiMenuChoice::Switch => write!(f, "🔄 切换配置 - 切换API配置"),
             ApiMenuChoice::List => write!(f, "📋 查看配置 - 列出所有配置"),
+            ApiMenuChoice::Apply => write!(f, "🚀 应用配置 - 应用到项目或全局"),
             ApiMenuChoice::Add => write!(f, "➕ 添加配置 - 添加新的API配置"),
             ApiMenuChoice::Edit => write!(f, "📝 编辑配置 - 修改现有配置"),
             ApiMenuChoice::Delete => write!(f, "❌ 删除配置 - 删除API配置"),
+            ApiMenuChoice::DetectSite => write!(f, "🌐 站点检测 - 检测站点并获取模型列表"),
+            ApiMenuChoice::DetectModel => write!(f, "🤖 模型检测 - 测试模型性能和可用性"),
             ApiMenuChoice::Back => write!(f, "⬅️  返回上一级菜单"),
         }
     }
@@ -125,9 +131,12 @@ pub fn show_api_menu(title: &str) -> crate::error::Result<ApiMenuChoice> {
     let choices = [
         ApiMenuChoice::Switch,
         ApiMenuChoice::List,
+        ApiMenuChoice::Apply,
         ApiMenuChoice::Add,
         ApiMenuChoice::Edit,
         ApiMenuChoice::Delete,
+        ApiMenuChoice::DetectSite,
+        ApiMenuChoice::DetectModel,
         ApiMenuChoice::Back,
     ];
 
@@ -161,6 +170,57 @@ pub fn wait_for_back_confirm(message: &str) -> crate::error::Result<()> {
         .interact()
         .map_err(|_| crate::error::CliError::UserCancelled)?;
     Ok(())
+}
+
+/// OpenCode 菜单选项 (去除 Switch 和 List)
+#[derive(Debug, Clone, Copy)]
+pub enum OpenCodeMenuChoice {
+    Apply,
+    Add,
+    Edit,
+    Delete,
+    DetectSite,
+    DetectModel,
+    Back,
+}
+
+impl fmt::Display for OpenCodeMenuChoice {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            OpenCodeMenuChoice::Apply => write!(f, "🚀 应用配置 - 应用到项目或全局"),
+            OpenCodeMenuChoice::Add => write!(f, "➕ 添加配置 - 添加新的API配置"),
+            OpenCodeMenuChoice::Edit => write!(f, "📝 编辑配置 - 修改现有配置"),
+            OpenCodeMenuChoice::Delete => write!(f, "❌ 删除配置 - 删除API配置"),
+            OpenCodeMenuChoice::DetectSite => write!(f, "🌐 站点检测 - 检测站点并获取模型列表"),
+            OpenCodeMenuChoice::DetectModel => write!(f, "🤖 模型检测 - 测试模型性能和可用性"),
+            OpenCodeMenuChoice::Back => write!(f, "⬅️  返回上一级菜单"),
+        }
+    }
+}
+
+/// 显示 OpenCode 专用菜单
+pub fn show_opencode_menu(title: &str) -> crate::error::Result<OpenCodeMenuChoice> {
+    println!("\n{}", style(title).cyan().bold());
+    println!("{}", style("═".repeat(40)).dim());
+
+    let choices = [
+        OpenCodeMenuChoice::Apply,
+        OpenCodeMenuChoice::Add,
+        OpenCodeMenuChoice::Edit,
+        OpenCodeMenuChoice::Delete,
+        OpenCodeMenuChoice::DetectSite,
+        OpenCodeMenuChoice::DetectModel,
+        OpenCodeMenuChoice::Back,
+    ];
+
+    let selection = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("请选择操作")
+        .items(&choices)
+        .default(0)
+        .interact()
+        .map_err(|_| crate::error::CliError::UserCancelled)?;
+
+    Ok(choices[selection])
 }
 
 /// 获取地区图标

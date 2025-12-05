@@ -222,36 +222,23 @@ impl OpenCodeConfigManager {
         // 读取完整的 provider 配置
         let opencode_config = self.read_config()?;
 
-        // 构建 provider 对象（只包含用到的 provider）
+        // 构建 provider 对象（只包含当前激活的 provider）
         let mut providers_map = serde_json::Map::new();
 
-        // 添加主模型的 provider
-        if let Some(main_provider) = opencode_config.get_provider(&active_config.main.provider) {
+        if let Some(provider) = opencode_config.get_provider(&active_config.provider) {
             providers_map.insert(
-                active_config.main.provider.clone(),
-                serde_json::to_value(main_provider)
-                    .map_err(|e| format!("序列化主模型 Provider 失败: {}", e))?,
+                active_config.provider.clone(),
+                serde_json::to_value(provider)
+                    .map_err(|e| format!("序列化 Provider 失败: {}", e))?,
             );
         }
 
-        // 添加轻量模型的 provider（如果不同的话）
-        if active_config.small.provider != active_config.main.provider {
-            if let Some(small_provider) = opencode_config.get_provider(&active_config.small.provider) {
-                providers_map.insert(
-                    active_config.small.provider.clone(),
-                    serde_json::to_value(small_provider)
-                        .map_err(|e| format!("序列化轻量模型 Provider 失败: {}", e))?,
-                );
-            }
-        }
-
         // 构建完整的 opencode.json 结构
+        // 注意: 不再设置 model 和 small_model,让 opencode 自己选择
         let sync_data = serde_json::json!({
             "$schema": "https://opencode.ai/config.json",
             "theme": "tokyonight",
             "autoupdate": false,
-            "model": format!("{}/{}", active_config.main.provider, active_config.main.model),
-            "small_model": format!("{}/{}", active_config.small.provider, active_config.small.model),
             "provider": providers_map,
             "tools": {
                 "get-current-session-id": true,
@@ -266,5 +253,55 @@ impl OpenCodeConfigManager {
 
         fs::write(&self.opencode_json, content)
             .map_err(|e| format!("写入 ~/.opencode/opencode.json 失败: {}", e))
+    }
+
+    /// 同步配置到项目级 .opencode/opencode.json
+    pub fn sync_to_project(&self, active_config: &OpenCodeActiveConfig) -> Result<(), String> {
+        // 获取当前工作目录
+        let current_dir = std::env::current_dir()
+            .map_err(|e| format!("获取当前目录失败: {}", e))?;
+
+        let project_opencode_dir = current_dir.join(".opencode");
+        let project_opencode_json = project_opencode_dir.join("opencode.json");
+
+        // 确保 .opencode 目录存在
+        if !project_opencode_dir.exists() {
+            fs::create_dir_all(&project_opencode_dir)
+                .map_err(|e| format!("创建项目 .opencode 目录失败: {}", e))?;
+        }
+
+        // 读取完整的 provider 配置
+        let opencode_config = self.read_config()?;
+
+        // 构建 provider 对象（只包含当前激活的 provider）
+        let mut providers_map = serde_json::Map::new();
+
+        if let Some(provider) = opencode_config.get_provider(&active_config.provider) {
+            providers_map.insert(
+                active_config.provider.clone(),
+                serde_json::to_value(provider)
+                    .map_err(|e| format!("序列化 Provider 失败: {}", e))?,
+            );
+        }
+
+        // 构建完整的 opencode.json 结构
+        let sync_data = serde_json::json!({
+            "$schema": "https://opencode.ai/config.json",
+            "theme": "tokyonight",
+            "autoupdate": false,
+            "provider": providers_map,
+            "tools": {
+                "get-current-session-id": true,
+                "webfetch": true
+            },
+            "agent": {},
+            "mcp": {}
+        });
+
+        let content = serde_json::to_string_pretty(&sync_data)
+            .map_err(|e| format!("序列化同步数据失败: {}", e))?;
+
+        fs::write(&project_opencode_json, content)
+            .map_err(|e| format!("写入 .opencode/opencode.json 失败: {}", e))
     }
 }

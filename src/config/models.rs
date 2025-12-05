@@ -321,6 +321,7 @@ pub struct CodexActiveReference {
 #[derive(Debug, Clone)]
 pub struct CodexActiveConfig {
     pub site: String,
+    #[allow(dead_code)]
     pub site_url: String,
     #[allow(dead_code)]
     pub site_description: Option<String>,
@@ -479,6 +480,7 @@ pub struct GeminiActiveReference {
 #[derive(Debug, Clone)]
 pub struct GeminiActiveConfig {
     pub site: String,
+    #[allow(dead_code)]
     pub site_url: String,
     #[allow(dead_code)]
     pub site_description: Option<String>,
@@ -611,6 +613,9 @@ pub struct OpenCodeProvider {
     // 内部元数据 (不同步到 opencode.json)
     #[serde(skip)]
     pub metadata: ProviderMetadata,
+    // 站点检测结果 (持久化缓存，不同步到 opencode.json)
+    #[serde(skip)]
+    pub site_detection: Option<SiteDetectionResult>,
 }
 
 /// Provider 选项配置
@@ -639,6 +644,9 @@ pub struct OpenCodeModelInfo {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<OpenCodeModelLimit>,
+    // 模型检测结果 (持久化缓存，不同步到 opencode.json)
+    #[serde(skip)]
+    pub model_detection: Option<ModelDetectionResult>,
 }
 
 /// 模型限制配置
@@ -650,39 +658,23 @@ pub struct OpenCodeModelLimit {
     pub output: Option<u64>,
 }
 
-/// 单个模型引用 (只记录引用,不存实际值)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OpenCodeModelReference {
-    pub provider: String, // Provider 名称
-    pub model: String,    // 模型ID
-}
-
 /// OpenCode 激活配置引用 (存储在 config.json 的 active.opencode)
+/// 简化设计: 只需要记录当前激活的 Provider 名称即可
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpenCodeActiveReference {
-    pub main: OpenCodeModelReference,  // 主模型引用
-    pub small: OpenCodeModelReference, // 轻量模型引用
+    pub provider: String, // 当前激活的 Provider 名称
 }
 
 /// 完整激活配置 (运行时从引用+provider数据构建)
 #[derive(Debug, Clone)]
 pub struct OpenCodeActiveConfig {
-    pub main: OpenCodeModelConfig,
-    pub small: OpenCodeModelConfig,
-}
-
-/// 单个模型的完整配置
-#[derive(Debug, Clone)]
-pub struct OpenCodeModelConfig {
     pub provider: String,
     #[allow(dead_code)]
     pub provider_description: Option<String>,
     pub base_url: String,
     #[allow(dead_code)]
     pub api_key: String,
-    pub model: String,
-    #[allow(dead_code)]
-    pub model_info: Option<OpenCodeModelInfo>,
+    pub models: std::collections::HashMap<String, OpenCodeModelInfo>,
 }
 
 // ============================================================================
@@ -741,6 +733,7 @@ impl OpenCodeProvider {
                 created_at: default_timestamp(),
                 updated_at: default_timestamp(),
             },
+            site_detection: None,
         }
     }
 
@@ -798,50 +791,81 @@ impl OpenCodeActiveConfig {
         reference: &OpenCodeActiveReference,
         config: &OpenCodeConfig,
     ) -> Result<Self, String> {
-        // 构建主模型配置
-        let main_provider = config
-            .get_provider(&reference.main.provider)
+        let provider = config
+            .get_provider(&reference.provider)
             .ok_or_else(|| {
-                format!(
-                    "Main model provider '{}' not found",
-                    reference.main.provider
-                )
+                format!("Provider '{}' not found", reference.provider)
             })?;
 
-        let main_model_info = main_provider.get_model(&reference.main.model).cloned();
-
-        let main = OpenCodeModelConfig {
-            provider: reference.main.provider.clone(),
-            provider_description: main_provider.metadata.description.clone(),
-            base_url: main_provider.options.base_url.clone(),
-            api_key: main_provider.options.api_key.clone(),
-            model: reference.main.model.clone(),
-            model_info: main_model_info,
-        };
-
-        // 构建轻量模型配置
-        let small_provider = config
-            .get_provider(&reference.small.provider)
-            .ok_or_else(|| {
-                format!(
-                    "Small model provider '{}' not found",
-                    reference.small.provider
-                )
-            })?;
-
-        let small_model_info = small_provider.get_model(&reference.small.model).cloned();
-
-        let small = OpenCodeModelConfig {
-            provider: reference.small.provider.clone(),
-            provider_description: small_provider.metadata.description.clone(),
-            base_url: small_provider.options.base_url.clone(),
-            api_key: small_provider.options.api_key.clone(),
-            model: reference.small.model.clone(),
-            model_info: small_model_info,
-        };
-
-        Ok(Self { main, small })
+        Ok(Self {
+            provider: reference.provider.clone(),
+            provider_description: provider.metadata.description.clone(),
+            base_url: provider.options.base_url.clone(),
+            api_key: provider.options.api_key.clone(),
+            models: provider.models.clone(),
+        })
     }
+}
+
+// ============================================================================
+// 站点检测和模型检测数据结构
+// ============================================================================
+
+/// 站点检测结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SiteDetectionResult {
+    /// 检测时间
+    pub detected_at: String,
+
+    /// 站点是否可用
+    pub is_available: bool,
+
+    /// API Key是否有效
+    pub api_key_valid: bool,
+
+    /// 检测到的模型列表
+    pub available_models: Vec<String>,
+
+    /// 站点响应时间(毫秒)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response_time_ms: Option<f64>,
+
+    /// 错误信息(如果检测失败)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
+}
+
+/// 模型检测结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelDetectionResult {
+    /// 检测时间
+    pub detected_at: String,
+
+    /// 模型ID
+    pub model_id: String,
+
+    /// 模型是否可用
+    pub is_available: bool,
+
+    /// 首次响应时间(TTFB, 毫秒)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub first_token_time_ms: Option<f64>,
+
+    /// Token生成速度(tokens/秒)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tokens_per_second: Option<f64>,
+
+    /// 总响应时间(毫秒)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_response_time_ms: Option<f64>,
+
+    /// 流式输出是否正常
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_available: Option<bool>,
+
+    /// 错误信息(如果检测失败)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
 }
 
 #[cfg(test)]

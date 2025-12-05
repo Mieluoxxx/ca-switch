@@ -2,9 +2,9 @@
 // 采用新架构:Provider与模型分离,支持跨Provider选择
 
 use crate::config::{ConfigManager, OpenCodeModelInfo, OpenCodeModelLimit, OpenCodeProvider};
-use crate::ui::style::{show_error, show_info, show_success};
+use crate::ui::style::{show_error, show_info, show_opencode_menu, show_success};
 use console::style;
-use dialoguer::{theme::ColorfulTheme, Input, Select};
+use dialoguer::{theme::ColorfulTheme, Input, MultiSelect, Select};
 use std::collections::HashMap;
 
 /// OpenCode 管理命令
@@ -24,41 +24,47 @@ impl OpenCodeCommand {
     pub fn execute(&mut self) -> Result<(), String> {
         loop {
             let choice =
-                crate::ui::show_api_menu("🚀 OpenCode配置管理").map_err(|e| e.to_string())?;
+                show_opencode_menu("🚀 OpenCode配置管理").map_err(|e| e.to_string())?;
 
-            use crate::ui::style::ApiMenuChoice;
+            use crate::ui::style::OpenCodeMenuChoice;
             match choice {
-                ApiMenuChoice::Switch => {
-                    if let Err(e) = self.handle_switch() {
-                        show_error(&format!("切换配置失败: {}", e));
+                OpenCodeMenuChoice::Apply => {
+                    if let Err(e) = self.handle_apply() {
+                        show_error(&format!("应用配置失败: {}", e));
                         self.wait_for_back();
                     }
                 }
-                ApiMenuChoice::List => {
-                    if let Err(e) = self.handle_list() {
-                        show_error(&format!("查看配置失败: {}", e));
-                        self.wait_for_back();
-                    }
-                }
-                ApiMenuChoice::Add => {
+                OpenCodeMenuChoice::Add => {
                     if let Err(e) = self.handle_add() {
                         show_error(&format!("添加配置失败: {}", e));
                         self.wait_for_back();
                     }
                 }
-                ApiMenuChoice::Edit => {
+                OpenCodeMenuChoice::Edit => {
                     if let Err(e) = self.handle_edit() {
                         show_error(&format!("编辑配置失败: {}", e));
                         self.wait_for_back();
                     }
                 }
-                ApiMenuChoice::Delete => {
+                OpenCodeMenuChoice::Delete => {
                     if let Err(e) = self.handle_delete() {
                         show_error(&format!("删除配置失败: {}", e));
                         self.wait_for_back();
                     }
                 }
-                ApiMenuChoice::Back => break,
+                OpenCodeMenuChoice::DetectSite => {
+                    if let Err(e) = self.handle_detect_site() {
+                        show_error(&format!("站点检测失败: {}", e));
+                        self.wait_for_back();
+                    }
+                }
+                OpenCodeMenuChoice::DetectModel => {
+                    if let Err(e) = self.handle_detect_model() {
+                        show_error(&format!("模型检测失败: {}", e));
+                        self.wait_for_back();
+                    }
+                }
+                OpenCodeMenuChoice::Back => break,
             }
         }
 
@@ -69,10 +75,10 @@ impl OpenCodeCommand {
     // 核心处理器
     // ========================================================================
 
-    /// 处理切换配置(支持跨Provider模型选择)
-    fn handle_switch(&mut self) -> Result<(), String> {
-        println!("\n{}", style("🔄 切换 OpenCode 配置").cyan().bold());
-        println!("{}", style("支持主模型和轻量模型来自不同Provider").dim());
+    /// 处理应用配置(支持多选Provider和多选应用范围)
+    fn handle_apply(&mut self) -> Result<(), String> {
+        println!("\n{}", style("🚀 应用 OpenCode 配置").cyan().bold());
+        println!("{}", style("选择要应用的 Provider 配置 (可多选)").dim());
         println!();
 
         // 读取所有 Provider
@@ -84,74 +90,7 @@ impl OpenCodeCommand {
             return Ok(());
         }
 
-        // ===== 第1步：选择主模型 =====
-        println!(
-            "{}",
-            style("📝 第1步: 选择主模型 (复杂任务使用)").white().bold()
-        );
-        let (main_provider, main_model) = self.select_model(&all_providers, "主模型")?;
-
-        // ===== 第2步：选择轻量模型 =====
-        println!(
-            "\n{}",
-            style("📝 第2步: 选择轻量模型 (简单任务使用)")
-                .white()
-                .bold()
-        );
-        let (small_provider, small_model) = self.select_model(&all_providers, "轻量模型")?;
-
-        // ===== 第3步：确认配置 =====
-        println!("\n{}", style("📋 配置预览：").white().bold());
-        println!();
-
-        println!("{}", style("主模型配置:").green());
-        println!(
-            "  {} {}",
-            style("Provider:").white(),
-            style(&main_provider).cyan()
-        );
-        println!("  {} {}", style("模型:").white(), style(&main_model).cyan());
-
-        println!();
-        println!("{}", style("轻量模型配置:").green());
-        println!(
-            "  {} {}",
-            style("Provider:").white(),
-            style(&small_provider).cyan()
-        );
-        println!(
-            "  {} {}",
-            style("模型:").white(),
-            style(&small_model).cyan()
-        );
-        println!();
-
-        if !self.confirm("确认切换配置", true)? {
-            show_info("用户取消切换");
-            return Ok(());
-        }
-
-        // ===== 第4步：执行切换 =====
-        self.config_manager.switch_opencode_config(
-            &main_provider,
-            &main_model,
-            &small_provider,
-            &small_model,
-        )?;
-
-        show_success("✨ OpenCode 配置切换成功！");
-        self.wait_for_back();
-
-        Ok(())
-    }
-
-    /// 选择模型(Provider + Model)
-    fn select_model(
-        &self,
-        all_providers: &HashMap<String, OpenCodeProvider>,
-        model_type: &str,
-    ) -> Result<(String, String), String> {
-        // 第1步：选择 Provider
+        // 多选 Provider
         let provider_names: Vec<String> = all_providers.keys().cloned().collect();
         let provider_items: Vec<String> = provider_names
             .iter()
@@ -165,143 +104,128 @@ impl OpenCodeCommand {
             })
             .collect();
 
-        let provider_idx = Select::with_theme(&ColorfulTheme::default())
-            .with_prompt(format!("选择 {} 的 Provider", model_type))
+        let provider_selections = MultiSelect::with_theme(&ColorfulTheme::default())
+            .with_prompt("选择要应用的 Provider (空格选择,回车确认)")
             .items(&provider_items)
-            .default(0)
             .interact()
             .map_err(|_| "用户取消操作")?;
 
-        let provider_name = provider_names[provider_idx].clone();
-        let provider = all_providers.get(&provider_name).unwrap();
-
-        println!(
-            "{} {}",
-            style("✓ 已选择 Provider:").green(),
-            style(&provider_name).cyan()
-        );
-
-        // 第2步：选择模型
-        if provider.models.is_empty() {
-            return Err(format!("Provider '{}' 没有可用的模型", provider_name));
+        if provider_selections.is_empty() {
+            show_info("未选择任何 Provider");
+            return Ok(());
         }
 
-        let model_ids: Vec<String> = provider.models.keys().cloned().collect();
-        let model_items: Vec<String> = model_ids
+        let selected_providers: Vec<String> = provider_selections
             .iter()
-            .map(|id| {
-                let model_info = provider.models.get(id).unwrap();
-                format!("🤖 {} ({})", id, model_info.name)
-            })
+            .map(|&idx| provider_names[idx].clone())
             .collect();
 
-        let model_idx = Select::with_theme(&ColorfulTheme::default())
-            .with_prompt(format!("选择 {} 的模型", model_type))
-            .items(&model_items)
-            .default(0)
-            .interact()
-            .map_err(|_| "用户取消操作")?;
-
-        let model_id = model_ids[model_idx].clone();
-
-        println!(
-            "{} {}",
-            style("✓ 已选择模型:").green(),
-            style(&model_id).cyan()
-        );
-
-        Ok((provider_name, model_id))
-    }
-
-    /// 处理查看配置
-    fn handle_list(&self) -> Result<(), String> {
-        println!("\n{}", style("📋 所有 OpenCode 配置").cyan().bold());
+        // 显示配置预览
+        println!("\n{}", style("📋 配置预览：").white().bold());
         println!();
-
-        // 显示当前激活的配置
-        if let Some(active) = self.config_manager.get_active_opencode_config()? {
-            println!("{}", style("🎯 当前使用的配置:").green().bold());
-            println!();
-
-            println!("{}", style("主模型配置:").white().bold());
-            println!(
-                "  {} {}",
-                style("Provider:").white(),
-                style(&active.main.provider).cyan()
-            );
+        for provider_name in &selected_providers {
+            let provider = all_providers.get(provider_name).unwrap();
+            println!("{}", style(provider_name).cyan().bold());
             println!(
                 "  {} {}",
                 style("Base URL:").white(),
-                style(&active.main.base_url).dim()
+                style(&provider.options.base_url).dim()
             );
-            println!(
-                "  {} {}",
-                style("模型:").white(),
-                style(&active.main.model).cyan()
-            );
-            println!();
 
-            println!("{}", style("轻量模型配置:").white().bold());
+            if let Some(ref desc) = provider.metadata.description {
+                println!("  {} {}", style("描述:").white(), style(desc).yellow());
+            }
+
+            let model_list: Vec<&str> = provider.models.keys().map(|s| s.as_str()).collect();
             println!(
                 "  {} {}",
-                style("Provider:").white(),
-                style(&active.small.provider).cyan()
+                style("可用模型:").white(),
+                style(model_list.join(", ")).yellow()
             );
-            println!(
-                "  {} {}",
-                style("Base URL:").white(),
-                style(&active.small.base_url).dim()
-            );
-            println!(
-                "  {} {}",
-                style("模型:").white(),
-                style(&active.small.model).cyan()
-            );
-            println!();
-        } else {
-            show_info("当前没有激活的 OpenCode 配置");
             println!();
         }
 
-        // 显示所有 Provider
-        let all_providers = self.config_manager.opencode().get_all_providers()?;
+        // 多选应用范围
+        println!("{}", style("📍 选择应用范围 (可多选):").white().bold());
+        let scope_choices = vec!["🌍 全局 - 应用到全局配置", "📁 项目 - 应用到当前项目"];
 
-        if all_providers.is_empty() {
-            show_info("没有找到任何 Provider 配置");
-        } else {
-            println!("{}", style("🌐 所有可用 Provider:").white().bold());
+        let scope_selections = MultiSelect::with_theme(&ColorfulTheme::default())
+            .with_prompt("选择应用范围 (空格选择,回车确认)")
+            .items(&scope_choices)
+            .interact()
+            .map_err(|_| "用户取消操作")?;
 
-            for (provider_name, provider) in &all_providers {
-                println!();
+        if scope_selections.is_empty() {
+            show_info("未选择任何应用范围");
+            return Ok(());
+        }
+
+        let apply_to_global = scope_selections.contains(&0);
+        let apply_to_project = scope_selections.contains(&1);
+
+        // 显示确认信息
+        println!();
+        println!(
+            "{}",
+            style(format!("✓ 将应用 {} 个 Provider", selected_providers.len())).green()
+        );
+        if apply_to_global {
+            println!("{}", style("✓ 将应用到全局配置").green());
+        }
+        if apply_to_project {
+            println!("{}", style("✓ 将应用到当前项目").green());
+        }
+        println!();
+
+        if !self.confirm("确认应用此配置", true)? {
+            show_info("用户取消应用");
+            return Ok(());
+        }
+
+        // 执行应用
+        for provider_name in &selected_providers {
+            println!();
+            println!(
+                "{}",
+                style(format!("正在应用 Provider: {}", provider_name))
+                    .cyan()
+                    .bold()
+            );
+
+            if apply_to_global {
+                self.config_manager.switch_opencode_config(provider_name)?;
+                show_success("✨ 已应用到全局配置！");
                 println!(
-                    "  {} {}",
-                    style("Provider:").white(),
-                    style(provider_name).cyan()
+                    "{}",
+                    style(format!("  配置文件: ~/.opencode/opencode.json")).dim()
                 );
-                println!(
-                    "  {} {}",
-                    style("Base URL:").white(),
-                    style(&provider.options.base_url).dim()
-                );
+            }
 
-                if let Some(ref npm) = provider.npm {
-                    println!("  {} {}", style("NPM:").white(), style(npm).dim());
+            if apply_to_project {
+                self.config_manager
+                    .apply_opencode_to_project(provider_name)?;
+                show_success("✨ 已应用到当前项目！");
+
+                // 获取当前目录并显示配置路径
+                if let Ok(current_dir) = std::env::current_dir() {
+                    println!(
+                        "{}",
+                        style(format!(
+                            "  配置文件: {}/.opencode/opencode.json",
+                            current_dir.display()
+                        ))
+                        .dim()
+                    );
                 }
-
-                if let Some(ref desc) = provider.metadata.description {
-                    println!("  {} {}", style("描述:").white(), style(desc).yellow());
-                }
-
-                let model_list: Vec<&str> = provider.models.keys().map(|s| s.as_str()).collect();
-                println!(
-                    "  {} {}",
-                    style("可用模型:").white(),
-                    style(model_list.join(", ")).yellow()
-                );
             }
         }
 
         println!();
+        show_success(&format!(
+            "🎉 成功应用 {} 个 Provider 配置！",
+            selected_providers.len()
+        ));
+
         self.wait_for_back();
 
         Ok(())
@@ -517,6 +441,7 @@ impl OpenCodeCommand {
         let model_info = OpenCodeModelInfo {
             name: model_name,
             limit,
+            model_detection: None,
         };
 
         self.config_manager.opencode_mut().add_model(
@@ -582,12 +507,18 @@ impl OpenCodeCommand {
             .get_provider(provider_name)?
             .ok_or_else(|| format!("Provider '{}' 不存在", provider_name))?;
 
-        // Base URL
-        let new_base_url: String = Input::with_theme(&ColorfulTheme::default())
-            .with_prompt("Base URL")
-            .default(provider.options.base_url.clone())
+        // Base URL (留空保持不变)
+        let base_url_input: String = Input::with_theme(&ColorfulTheme::default())
+            .with_prompt("Base URL (留空保持不变)")
+            .allow_empty(true)
             .interact_text()
             .map_err(|_| "用户取消操作")?;
+
+        let new_base_url = if base_url_input.trim().is_empty() {
+            None
+        } else {
+            Some(base_url_input)
+        };
 
         // API Key
         let new_api_key: String = dialoguer::Password::with_theme(&ColorfulTheme::default())
@@ -634,7 +565,7 @@ impl OpenCodeCommand {
             .opencode_mut()
             .update_provider_metadata(
                 provider_name,
-                Some(new_base_url),
+                new_base_url,
                 new_api_key,
                 new_npm,
                 new_description,
@@ -789,6 +720,358 @@ impl OpenCodeCommand {
             .default(default)
             .interact()
             .map_err(|_| "用户取消操作".to_string())
+    }
+
+    // ========================================================================
+    // 站点检测和模型检测
+    // ========================================================================
+
+    /// 处理站点检测
+    fn handle_detect_site(&mut self) -> Result<(), String> {
+        println!("\n{}", style("🌐 站点检测").cyan().bold());
+
+        // 1. 获取所有Providers
+        let all_providers = self.config_manager.opencode().get_all_providers()?;
+
+        if all_providers.is_empty() {
+            show_error("没有可用的Provider");
+            show_info("请先使用「添加配置」功能添加 Provider");
+            return Ok(());
+        }
+
+        // 2. 选择要诊断的Provider
+        let provider_name = self.select_provider(&all_providers)?;
+        let provider = all_providers
+            .get(&provider_name)
+            .ok_or("Provider不存在")?;
+
+        println!("\n{}", style(format!("Provider: {}", provider_name)).white());
+        println!(
+            "{}",
+            style(format!("Base URL: {}", provider.options.base_url)).dim()
+        );
+
+        // 3. 执行检测
+        show_info("正在检测站点...");
+
+        use crate::config::Detector;
+
+        let detector = Detector::new();
+        let base_url = provider.options.base_url.clone();
+        let api_key = provider.options.api_key.clone();
+
+        let result = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                detector.detect_site(&base_url, &api_key).await
+            })
+        });
+
+        // 4. 显示结果
+        self.show_site_detection_report(&result);
+
+        // 5. 批量导入模型(如果检测成功)
+        if result.is_available && !result.available_models.is_empty() {
+            if self.confirm("是否批量导入检测到的模型?", true)? {
+                self.batch_import_models(&provider_name, &result.available_models)?;
+            }
+        }
+
+        // 6. 保存检测结果
+        if self.confirm("是否保存检测结果到配置?", true)? {
+            self.save_site_detection(&provider_name, result)?;
+            show_success("检测结果已保存");
+        }
+
+        Ok(())
+    }
+
+    /// 显示站点检测报告
+    fn show_site_detection_report(&self, result: &crate::config::models::SiteDetectionResult) {
+        println!("\n{}", style("═".repeat(60)).dim());
+        println!("{}", style("📊 站点检测报告").cyan().bold());
+        println!("{}", style("═".repeat(60)).dim());
+
+        // 站点状态
+        if result.is_available {
+            println!("\n{} {}", "✅", style("站点状态: 可用").green().bold());
+            println!("{} {}", "🔑", style("API Key: 有效").green());
+
+            if let Some(time) = result.response_time_ms {
+                println!(
+                    "{} {} ms",
+                    "⚡",
+                    style(format!("响应时间: {:.0}", time)).yellow()
+                );
+            }
+
+            println!(
+                "\n{} {} 个",
+                "🤖",
+                style(format!(
+                    "检测到模型: {}",
+                    result.available_models.len()
+                ))
+                .cyan()
+                .bold()
+            );
+
+            for (i, model) in result.available_models.iter().enumerate() {
+                println!("  {}. {}", i + 1, style(model).white());
+            }
+        } else {
+            println!(
+                "\n{} {}",
+                "❌",
+                style("站点状态: 不可用").red().bold()
+            );
+
+            if let Some(err) = &result.error_message {
+                println!("{} {}", "⚠️ ", style(format!("错误: {}", err)).yellow());
+            }
+        }
+
+        println!(
+            "\n{}",
+            style(format!("检测时间: {}", result.detected_at)).dim()
+        );
+        println!("{}", style("═".repeat(60)).dim());
+    }
+
+    /// 批量导入模型
+    fn batch_import_models(&mut self, provider_name: &str, models: &[String]) -> Result<(), String> {
+        let mut imported = 0;
+
+        for model_id in models {
+            // 检查模型是否已存在
+            if self
+                .config_manager
+                .opencode()
+                .get_models(provider_name)?
+                .contains_key(model_id)
+            {
+                continue; // 跳过已存在的
+            }
+
+            // 添加模型
+            let new_model_info = OpenCodeModelInfo {
+                name: model_id.clone(),
+                limit: None,
+                model_detection: None,
+            };
+
+            self.config_manager.opencode_mut().add_model(
+                provider_name,
+                model_id.clone(),
+                new_model_info,
+            )?;
+
+            imported += 1;
+        }
+
+        show_success(&format!("成功导入 {} 个新模型", imported));
+        Ok(())
+    }
+
+    /// 保存站点检测结果
+    fn save_site_detection(
+        &mut self,
+        provider_name: &str,
+        result: crate::config::models::SiteDetectionResult,
+    ) -> Result<(), String> {
+        let mut config = self.config_manager.opencode().read_config()?;
+
+        if let Some(provider) = config.providers.get_mut(provider_name) {
+            provider.site_detection = Some(result);
+        } else {
+            return Err("Provider不存在".to_string());
+        }
+
+        self.config_manager.opencode().write_config(&config)?;
+        Ok(())
+    }
+
+    /// 处理模型检测
+    fn handle_detect_model(&mut self) -> Result<(), String> {
+        println!("\n{}", style("🤖 模型检测").cyan().bold());
+
+        // 1. 选择Provider
+        let all_providers = self.config_manager.opencode().get_all_providers()?;
+
+        if all_providers.is_empty() {
+            show_error("没有可用的Provider");
+            show_info("请先使用「添加配置」功能添加 Provider");
+            return Ok(());
+        }
+
+        let provider_name = self.select_provider(&all_providers)?;
+        let provider = all_providers
+            .get(&provider_name)
+            .ok_or("Provider不存在")?;
+
+        // 2. 选择模型
+        let models = self.config_manager.opencode().get_models(&provider_name)?;
+
+        if models.is_empty() {
+            show_error("该Provider没有配置模型");
+            show_info("请先添加模型或使用站点检测功能批量导入");
+            return Ok(());
+        }
+
+        let model_id = self.select_model_from_list(&models)?;
+
+        println!(
+            "\n{}",
+            style(format!("Provider: {}", provider_name)).white()
+        );
+        println!("{}", style(format!("Model: {}", model_id)).white());
+
+        // 3. 询问是否测试流式输出
+        let test_stream = self.confirm("是否测试流式输出功能?", false)?;
+
+        // 4. 执行检测
+        show_info("正在检测模型...");
+
+        use crate::config::Detector;
+
+        let detector = Detector::new();
+        let base_url = provider.options.base_url.clone();
+        let api_key = provider.options.api_key.clone();
+
+        let result = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                detector
+                    .detect_model(&base_url, &api_key, &model_id, test_stream)
+                    .await
+            })
+        });
+
+        // 5. 显示结果
+        self.show_model_detection_report(&result);
+
+        // 6. 保存检测结果
+        if result.is_available {
+            if self.confirm("是否保存检测结果到配置?", true)? {
+                self.save_model_detection(&provider_name, &model_id, result)?;
+                show_success("检测结果已保存");
+            }
+        }
+
+        Ok(())
+    }
+
+    /// 显示模型检测报告
+    fn show_model_detection_report(&self, result: &crate::config::models::ModelDetectionResult) {
+        println!("\n{}", style("═".repeat(60)).dim());
+        println!(
+            "{}",
+            style(format!("📊 模型检测报告: {}", result.model_id))
+                .cyan()
+                .bold()
+        );
+        println!("{}", style("═".repeat(60)).dim());
+
+        if result.is_available {
+            println!("\n{} {}", "✅", style("模型状态: 可用").green().bold());
+
+            if let Some(time) = result.first_token_time_ms {
+                println!(
+                    "{} {} ms",
+                    "⚡",
+                    style(format!("首次响应时间: {:.0}", time)).yellow()
+                );
+            }
+
+            if let Some(time) = result.total_response_time_ms {
+                println!(
+                    "{} {} ms",
+                    "⏱️ ",
+                    style(format!("总响应时间: {:.0}", time)).yellow()
+                );
+            }
+
+            if let Some(tps) = result.tokens_per_second {
+                println!(
+                    "{} {} tokens/s",
+                    "🚀",
+                    style(format!("Token速度: {:.2}", tps)).cyan().bold()
+                );
+            }
+
+            if let Some(stream) = result.stream_available {
+                if stream {
+                    println!(
+                        "{} {}",
+                        "✅",
+                        style("流式输出: 支持").green()
+                    );
+                } else {
+                    println!(
+                        "{} {}",
+                        "❌",
+                        style("流式输出: 不支持").red()
+                    );
+                }
+            }
+        } else {
+            println!(
+                "\n{} {}",
+                "❌",
+                style("模型状态: 不可用").red().bold()
+            );
+
+            if let Some(err) = &result.error_message {
+                println!("{} {}", "⚠️ ", style(format!("错误: {}", err)).yellow());
+            }
+        }
+
+        println!(
+            "\n{}",
+            style(format!("检测时间: {}", result.detected_at)).dim()
+        );
+        println!("{}", style("═".repeat(60)).dim());
+    }
+
+    /// 保存模型检测结果
+    fn save_model_detection(
+        &mut self,
+        provider_name: &str,
+        model_id: &str,
+        result: crate::config::models::ModelDetectionResult,
+    ) -> Result<(), String> {
+        let mut config = self.config_manager.opencode().read_config()?;
+
+        if let Some(provider) = config.providers.get_mut(provider_name) {
+            if let Some(model_info) = provider.models.get_mut(model_id) {
+                model_info.model_detection = Some(result);
+            } else {
+                return Err("模型不存在".to_string());
+            }
+        } else {
+            return Err("Provider不存在".to_string());
+        }
+
+        self.config_manager.opencode().write_config(&config)?;
+        Ok(())
+    }
+
+    /// 从模型列表中选择模型
+    fn select_model_from_list(
+        &self,
+        models: &HashMap<String, OpenCodeModelInfo>,
+    ) -> Result<String, String> {
+        let mut model_list: Vec<_> = models.iter().collect();
+        model_list.sort_by(|a, b| a.0.cmp(b.0));
+
+        let model_names: Vec<String> = model_list.iter().map(|(id, _)| (*id).clone()).collect();
+
+        let selection_idx = Select::with_theme(&ColorfulTheme::default())
+            .with_prompt("选择模型")
+            .items(&model_names)
+            .default(0)
+            .interact()
+            .map_err(|_| "用户取消操作")?;
+
+        Ok(model_names[selection_idx].clone())
     }
 
     /// 等待用户返回

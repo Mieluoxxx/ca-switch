@@ -331,63 +331,50 @@ impl ConfigManager {
         }
     }
 
-    /// 切换 OpenCode 配置
-    pub fn switch_opencode_config(
-        &mut self,
-        main_provider: &str,
-        main_model: &str,
-        small_provider: &str,
-        small_model: &str,
-    ) -> Result<(), String> {
-        // 1. 验证主模型的 Provider 和模型是否存在
+    /// 切换 OpenCode 配置(简化版:只需指定Provider)
+    pub fn switch_opencode_config(&mut self, provider: &str) -> Result<(), String> {
+        // 1. 验证 Provider 是否存在
         let opencode_config = self.opencode_manager.read_config()?;
 
-        let main_provider_obj = opencode_config
-            .get_provider(main_provider)
-            .ok_or_else(|| format!("主模型 Provider '{}' 不存在", main_provider))?;
-
-        if main_provider_obj.get_model(main_model).is_none() {
-            return Err(format!(
-                "主模型 '{}' 不存在于 Provider '{}'",
-                main_model, main_provider
-            ));
+        if opencode_config.get_provider(provider).is_none() {
+            return Err(format!("Provider '{}' 不存在", provider));
         }
 
-        // 2. 验证轻量模型的 Provider 和模型是否存在
-        let small_provider_obj = opencode_config
-            .get_provider(small_provider)
-            .ok_or_else(|| format!("轻量模型 Provider '{}' 不存在", small_provider))?;
-
-        if small_provider_obj.get_model(small_model).is_none() {
-            return Err(format!(
-                "轻量模型 '{}' 不存在于 Provider '{}'",
-                small_model, small_provider
-            ));
-        }
-
-        // 3. 创建激活引用
-        use crate::config::models::OpenCodeModelReference;
-
+        // 2. 创建激活引用
         let reference = OpenCodeActiveReference {
-            main: OpenCodeModelReference {
-                provider: main_provider.to_string(),
-                model: main_model.to_string(),
-            },
-            small: OpenCodeModelReference {
-                provider: small_provider.to_string(),
-                model: small_model.to_string(),
-            },
+            provider: provider.to_string(),
         };
 
-        // 4. 更新全局配置
+        // 3. 更新全局配置
         let mut global_config = self.read_global_config()?;
         global_config.active.opencode = Some(reference.clone());
         global_config.update_timestamp();
         self.write_global_config(&global_config)?;
 
-        // 5. 构建完整配置并同步到 ~/.opencode/
+        // 4. 构建完整配置并同步到 ~/.opencode/
         let active_config = OpenCodeActiveConfig::from_reference(&reference, &opencode_config)?;
         self.opencode_manager.sync_to_opencode(&active_config)?;
+
+        Ok(())
+    }
+
+    /// 应用 OpenCode 配置到项目级
+    pub fn apply_opencode_to_project(&mut self, provider: &str) -> Result<(), String> {
+        // 1. 验证 Provider 是否存在
+        let opencode_config = self.opencode_manager.read_config()?;
+
+        if opencode_config.get_provider(provider).is_none() {
+            return Err(format!("Provider '{}' 不存在", provider));
+        }
+
+        // 2. 创建激活引用
+        let reference = OpenCodeActiveReference {
+            provider: provider.to_string(),
+        };
+
+        // 3. 构建完整配置并同步到项目 .opencode/
+        let active_config = OpenCodeActiveConfig::from_reference(&reference, &opencode_config)?;
+        self.opencode_manager.sync_to_project(&active_config)?;
 
         Ok(())
     }

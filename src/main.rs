@@ -126,10 +126,10 @@ fn show_status() -> Result<()> {
     println!("\n{}", style("🚀 OpenCode 配置:").white().bold());
     match config_manager.get_active_opencode_config()? {
         Some(config) => {
-            println!("  {} {}", style("主模型Provider:").white(), style(&config.main.provider).cyan());
-            println!("  {} {}", style("主模型:").white(), style(&config.main.model).yellow());
-            println!("  {} {}", style("轻量模型Provider:").white(), style(&config.small.provider).cyan());
-            println!("  {} {}", style("轻量模型:").white(), style(&config.small.model).yellow());
+            println!("  {} {}", style("Provider:").white(), style(&config.provider).cyan());
+            println!("  {} {}", style("Base URL:").white(), style(&config.base_url).dim());
+            let model_list: Vec<&str> = config.models.keys().map(|s| s.as_str()).collect();
+            println!("  {} {}", style("可用模型:").white(), style(model_list.join(", ")).yellow());
         }
         None => {
             show_info("未配置 OpenCode");
