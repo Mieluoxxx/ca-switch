@@ -15,7 +15,7 @@ use std::path::PathBuf;
 
 /// 核心配置管理器
 pub struct ConfigManager {
-    global_config_file: PathBuf, // ~/.cc-cli/config.json
+    global_config_file: PathBuf, // ~/.ca-switch/config.json
     claude_manager: ClaudeConfigManager,
     codex_manager: CodexConfigManager,
     gemini_manager: GeminiConfigManager,
@@ -26,7 +26,7 @@ impl ConfigManager {
     /// 创建新的配置管理器
     pub fn new() -> Result<Self, String> {
         let home_dir = dirs::home_dir().ok_or("无法获取用户主目录")?;
-        let config_dir = home_dir.join(".cc-cli");
+        let config_dir = home_dir.join(".ca-switch");
         let global_config_file = config_dir.join("config.json");
 
         // 确保配置目录存在

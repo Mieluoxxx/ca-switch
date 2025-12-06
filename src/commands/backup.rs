@@ -208,7 +208,7 @@ impl BackupCommand {
     fn select_backup_categories(&self) -> Result<Vec<String>> {
         let categories = vec![
             BackupCategory::new(
-                "🔧 CC-CLI配置 (.cc-cli/)",
+                "🔧 CA-Switch配置 (.ca-switch/)",
                 "ccCli",
                 true,
             ),

@@ -1,5 +1,5 @@
 // Codex 配置管理器
-// 负责管理 ~/.cc-cli/codex.json 和同步到 ~/.codex/
+// 负责管理 ~/.ca-switch/codex.json 和同步到 ~/.codex/
 
 use crate::config::models::{CodexActiveConfig, CodexConfig, CodexSite};
 use serde_json;
@@ -10,8 +10,8 @@ use std::path::PathBuf;
 /// Codex 配置管理器
 pub struct CodexConfigManager {
     #[allow(dead_code)]
-    config_dir: PathBuf,         // ~/.cc-cli
-    codex_config_file: PathBuf,  // ~/.cc-cli/codex.json
+    config_dir: PathBuf,         // ~/.ca-switch
+    codex_config_file: PathBuf,  // ~/.ca-switch/codex.json
     codex_dir: PathBuf,          // ~/.codex
     codex_config_toml: PathBuf,  // ~/.codex/config.toml
     codex_auth_json: PathBuf,    // ~/.codex/auth.json
@@ -20,7 +20,7 @@ pub struct CodexConfigManager {
 impl CodexConfigManager {
     /// 创建新的 Codex 配置管理器
     pub fn new(config_dir: PathBuf) -> Result<Self, String> {
-        // 确保 ~/.cc-cli 目录存在
+        // 确保 ~/.ca-switch 目录存在
         if !config_dir.exists() {
             fs::create_dir_all(&config_dir)
                 .map_err(|e| format!("创建配置目录失败: {}", e))?;

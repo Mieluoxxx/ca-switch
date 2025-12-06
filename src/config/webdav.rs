@@ -86,7 +86,7 @@ impl WebDAVClient {
         let home_dir = dirs::home_dir()
             .ok_or_else(|| CliError::Config("无法获取用户主目录".to_string()))?;
 
-        let config_path = home_dir.join(".cc-cli").join("webdav-config.json");
+        let config_path = home_dir.join(".ca-switch").join("webdav-config.json");
 
         Ok(Self {
             config_path,
@@ -287,7 +287,7 @@ impl WebDAVClient {
 
     /// 确保备份目录存在
     async fn ensure_backup_directory(&self) -> Result<()> {
-        let backup_dir = "/cc-cli-backups";
+        let backup_dir = "/ca-switch-backups";
 
         if let Some(ref client) = self.client {
             if let Some(ref config) = self.config {
@@ -360,7 +360,7 @@ impl WebDAVClient {
         }
 
         let content = serde_json::to_string_pretty(data)?;
-        let remote_path = format!("/cc-cli-backups/{file_name}");
+        let remote_path = format!("/ca-switch-backups/{file_name}");
 
         if let Some(ref client) = self.client {
             if let Some(ref config) = self.config {
@@ -404,7 +404,7 @@ impl WebDAVClient {
 
         if let Some(ref client) = self.client {
             if let Some(ref config) = self.config {
-                let url = format!("{}{}", config.url.trim_end_matches('/'), "/cc-cli-backups");
+                let url = format!("{}{}", config.url.trim_end_matches('/'), "/ca-switch-backups");
 
                 let method = reqwest::Method::from_bytes(b"PROPFIND")
                     .map_err(|e| CliError::Config(format!("创建 PROPFIND 方法失败: {e}")))?;
@@ -938,7 +938,7 @@ impl WebDAVClient {
     pub async fn get_storage_info(&self) -> Result<StorageInfo> {
         if let Some(ref client) = self.client {
             if let Some(ref config) = self.config {
-                let url = format!("{}{}", config.url.trim_end_matches('/'), "/cc-cli-backups");
+                let url = format!("{}{}", config.url.trim_end_matches('/'), "/ca-switch-backups");
 
                 let method = reqwest::Method::from_bytes(b"PROPFIND")
                     .map_err(|e| CliError::Config(format!("创建 PROPFIND 方法失败: {e}")))?;

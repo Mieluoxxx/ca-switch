@@ -34,7 +34,7 @@ pub struct PromptCommand {
 impl PromptCommand {
     pub fn new() -> Result<Self> {
         let home = dirs::home_dir().ok_or_else(|| CliError::Config("无法获取用户主目录".into()))?;
-        let prompts_dir = home.join(".cc-cli").join("prompts");
+        let prompts_dir = home.join(".ca-switch").join("prompts");
         let index_file = prompts_dir.join("index.json");
 
         // 确保 prompts 目录存在

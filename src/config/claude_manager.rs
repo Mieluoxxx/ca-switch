@@ -1,5 +1,5 @@
 // Claude 配置管理器
-// 负责管理 ~/.cc-cli/claude.json 和同步到 ~/.claude/settings.json
+// 负责管理 ~/.ca-switch/claude.json 和同步到 ~/.claude/settings.json
 
 use crate::config::models::{
     ClaudeActiveConfig, ClaudeConfig, ClaudeSite, VertexConfig,
@@ -11,8 +11,8 @@ use std::path::PathBuf;
 /// Claude 配置管理器
 pub struct ClaudeConfigManager {
     #[allow(dead_code)]
-    config_dir: PathBuf,       // ~/.cc-cli
-    claude_config_file: PathBuf, // ~/.cc-cli/claude.json
+    config_dir: PathBuf,       // ~/.ca-switch
+    claude_config_file: PathBuf, // ~/.ca-switch/claude.json
     #[allow(dead_code)]
     claude_dir: PathBuf,       // ~/.claude
     settings_file: PathBuf,    // ~/.claude/settings.json
@@ -23,7 +23,7 @@ impl ClaudeConfigManager {
     pub fn new() -> Result<Self, String> {
         let home_dir = dirs::home_dir().ok_or("无法获取用户主目录")?;
 
-        let config_dir = home_dir.join(".cc-cli");
+        let config_dir = home_dir.join(".ca-switch");
         let claude_config_file = config_dir.join("claude.json");
         let claude_dir = home_dir.join(".claude");
         let settings_file = claude_dir.join("settings.json");

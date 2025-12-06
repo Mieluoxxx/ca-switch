@@ -80,13 +80,13 @@ impl FileManager {
         let cc_cli_files = HashMap::new();
         let mut cc_cli_dirs = HashMap::new();
         cc_cli_dirs.insert(
-            ".cc-cli".to_string(),
-            self.home_dir.join(".cc-cli"),
+            ".ca-switch".to_string(),
+            self.home_dir.join(".ca-switch"),
         );
         paths.insert(
             "ccCli".to_string(),
             CategoryPaths {
-                name: "CC-CLI配置".to_string(),
+                name: "CA-Switch配置".to_string(),
                 files: cc_cli_files,
                 directories: cc_cli_dirs,
             },

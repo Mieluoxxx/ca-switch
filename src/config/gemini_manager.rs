@@ -1,5 +1,5 @@
 // Gemini 配置管理器
-// 负责管理 ~/.cc-cli/gemini.json 和同步到 ~/.gemini/
+// 负责管理 ~/.ca-switch/gemini.json 和同步到 ~/.gemini/
 
 use crate::config::models::{GeminiActiveConfig, GeminiConfig, GeminiSite};
 use serde_json;
@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 /// Gemini 配置管理器
 pub struct GeminiConfigManager {
-    gemini_config_file: PathBuf,  // ~/.cc-cli/gemini.json
+    gemini_config_file: PathBuf,  // ~/.ca-switch/gemini.json
     gemini_dir: PathBuf,           // ~/.gemini
     gemini_env_file: PathBuf,      // ~/.gemini/.env
 }
@@ -17,7 +17,7 @@ pub struct GeminiConfigManager {
 impl GeminiConfigManager {
     /// 创建新的 Gemini 配置管理器
     pub fn new(config_dir: PathBuf) -> Result<Self, String> {
-        // 确保 ~/.cc-cli 目录存在
+        // 确保 ~/.ca-switch 目录存在
         if !config_dir.exists() {
             fs::create_dir_all(&config_dir)
                 .map_err(|e| format!("创建配置目录失败: {}", e))?;

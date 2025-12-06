@@ -1,5 +1,5 @@
 // OpenCode 配置管理器
-// 负责管理 ~/.cc-cli/opencode.json 和同步到 ~/.opencode/opencode.json
+// 负责管理 ~/.ca-switch/opencode.json 和同步到 ~/.opencode/opencode.json
 
 use crate::config::models::{
     OpenCodeActiveConfig, OpenCodeConfig, OpenCodeModelInfo, OpenCodeProvider,
@@ -11,7 +11,7 @@ use std::path::PathBuf;
 
 /// OpenCode 配置管理器
 pub struct OpenCodeConfigManager {
-    opencode_config_file: PathBuf,  // ~/.cc-cli/opencode.json
+    opencode_config_file: PathBuf,  // ~/.ca-switch/opencode.json
     opencode_dir: PathBuf,          // ~/.opencode
     opencode_json: PathBuf,         // ~/.opencode/opencode.json
 }
@@ -19,7 +19,7 @@ pub struct OpenCodeConfigManager {
 impl OpenCodeConfigManager {
     /// 创建新的 OpenCode 配置管理器
     pub fn new(config_dir: PathBuf) -> Result<Self, String> {
-        // 确保 ~/.cc-cli 目录存在
+        // 确保 ~/.ca-switch 目录存在
         if !config_dir.exists() {
             fs::create_dir_all(&config_dir)
                 .map_err(|e| format!("创建配置目录失败: {}", e))?;
