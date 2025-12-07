@@ -149,16 +149,28 @@ impl OpenCodeCommand {
         println!("{}", style("📍 选择应用范围 (可多选):").white().bold());
         let scope_choices = vec!["🌍 全局 - 应用到全局配置", "📁 项目 - 应用到当前项目"];
 
-        let scope_selections = MultiSelect::with_theme(&ColorfulTheme::default())
-            .with_prompt("选择应用范围 (空格选择,回车确认)")
-            .items(&scope_choices)
-            .interact()
-            .map_err(|_| "用户取消操作")?;
+        // 循环验证：确保用户选择至少一个应用范围
+        let scope_selections = loop {
+            let selections = MultiSelect::with_theme(&ColorfulTheme::default())
+                .with_prompt("选择应用范围 (空格选择,回车确认) - ⚠️ 必须至少选择一项")
+                .items(&scope_choices)
+                .interact()
+                .map_err(|_| "用户取消操作")?;
 
-        if scope_selections.is_empty() {
-            show_info("未选择任何应用范围");
-            return Ok(());
-        }
+            if selections.is_empty() {
+                show_error("❌ 必须至少选择一个应用范围！");
+                
+                // 提供继续或取消的选项
+                if !self.confirm("是否继续选择应用范围？", true)? {
+                    show_info("用户取消应用配置");
+                    return Ok(());
+                }
+                continue; // 重新显示选择界面
+            }
+            
+            // 成功选择，返回结果
+            break selections;
+        };
 
         let apply_to_global = scope_selections.contains(&0);
         let apply_to_project = scope_selections.contains(&1);
@@ -183,40 +195,47 @@ impl OpenCodeCommand {
         }
 
         // 执行应用
-        for provider_name in &selected_providers {
+        if apply_to_global {
             println!();
             println!(
                 "{}",
-                style(format!("正在应用 Provider: {}", provider_name))
+                style("正在应用 Provider 到全局配置...")
                     .cyan()
                     .bold()
             );
+            
+            self.config_manager
+                .apply_multiple_opencode_to_global(&selected_providers)?;
+            show_success("✨ 已应用到全局配置！");
+            println!(
+                "{}",
+                style("  配置文件: ~/.opencode/opencode.json").dim()
+            );
+        }
 
-            if apply_to_global {
-                self.config_manager.switch_opencode_config(provider_name)?;
-                show_success("✨ 已应用到全局配置！");
+        if apply_to_project {
+            println!();
+            println!(
+                "{}",
+                style("正在应用 Provider 到当前项目...")
+                    .cyan()
+                    .bold()
+            );
+            
+            self.config_manager
+                .apply_multiple_opencode_to_project(&selected_providers)?;
+            show_success("✨ 已应用到当前项目！");
+
+            // 获取当前目录并显示配置路径
+            if let Ok(current_dir) = std::env::current_dir() {
                 println!(
                     "{}",
-                    style(format!("  配置文件: ~/.opencode/opencode.json")).dim()
+                    style(format!(
+                        "  配置文件: {}/.opencode/opencode.json",
+                        current_dir.display()
+                    ))
+                    .dim()
                 );
-            }
-
-            if apply_to_project {
-                self.config_manager
-                    .apply_opencode_to_project(provider_name)?;
-                show_success("✨ 已应用到当前项目！");
-
-                // 获取当前目录并显示配置路径
-                if let Ok(current_dir) = std::env::current_dir() {
-                    println!(
-                        "{}",
-                        style(format!(
-                            "  配置文件: {}/.opencode/opencode.json",
-                            current_dir.display()
-                        ))
-                        .dim()
-                    );
-                }
             }
         }
 

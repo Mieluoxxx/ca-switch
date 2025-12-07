@@ -378,6 +378,52 @@ impl ConfigManager {
 
         Ok(())
     }
+
+    /// 应用多个 OpenCode Provider 配置到全局
+    pub fn apply_multiple_opencode_to_global(&mut self, provider_names: &[String]) -> Result<(), String> {
+        // 1. 验证所有 Provider 是否存在
+        let opencode_config = self.opencode_manager.read_config()?;
+
+        for provider_name in provider_names {
+            if opencode_config.get_provider(provider_name).is_none() {
+                return Err(format!("Provider '{}' 不存在", provider_name));
+            }
+        }
+
+        // 2. 更新全局配置（只记录第一个provider为激活状态，保持兼容性）
+        if let Some(first_provider) = provider_names.first() {
+            let reference = OpenCodeActiveReference {
+                provider: first_provider.clone(),
+            };
+
+            let mut global_config = self.read_global_config()?;
+            global_config.active.opencode = Some(reference);
+            global_config.update_timestamp();
+            self.write_global_config(&global_config)?;
+        }
+
+        // 3. 同步所有Provider到 ~/.opencode/
+        self.opencode_manager.sync_multiple_providers_to_opencode(provider_names)?;
+
+        Ok(())
+    }
+
+    /// 应用多个 OpenCode Provider 配置到项目级
+    pub fn apply_multiple_opencode_to_project(&mut self, provider_names: &[String]) -> Result<(), String> {
+        // 1. 验证所有 Provider 是否存在
+        let opencode_config = self.opencode_manager.read_config()?;
+
+        for provider_name in provider_names {
+            if opencode_config.get_provider(provider_name).is_none() {
+                return Err(format!("Provider '{}' 不存在", provider_name));
+            }
+        }
+
+        // 2. 同步所有Provider到项目 .opencode/
+        self.opencode_manager.sync_multiple_providers_to_project(provider_names)?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]

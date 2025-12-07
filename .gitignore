@@ -4,3 +4,4 @@ bun.lock
 .claude/
 target/
 .opencode/opencode.json
+Cargo.lock

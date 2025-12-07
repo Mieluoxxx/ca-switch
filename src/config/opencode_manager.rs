@@ -255,6 +255,51 @@ impl OpenCodeConfigManager {
             .map_err(|e| format!("写入 ~/.opencode/opencode.json 失败: {}", e))
     }
 
+    /// 同步多个Provider配置到 OpenCode 官方配置文件
+    pub fn sync_multiple_providers_to_opencode(&self, provider_names: &[String]) -> Result<(), String> {
+        // 确保 ~/.opencode 目录存在
+        if !self.opencode_dir.exists() {
+            fs::create_dir_all(&self.opencode_dir)
+                .map_err(|e| format!("创建 .opencode 目录失败: {}", e))?;
+        }
+
+        // 读取完整的 provider 配置
+        let opencode_config = self.read_config()?;
+
+        // 构建 provider 对象（包含所有指定的 provider）
+        let mut providers_map = serde_json::Map::new();
+
+        for provider_name in provider_names {
+            if let Some(provider) = opencode_config.get_provider(provider_name) {
+                providers_map.insert(
+                    provider_name.clone(),
+                    serde_json::to_value(provider)
+                        .map_err(|e| format!("序列化 Provider '{}' 失败: {}", provider_name, e))?,
+                );
+            }
+        }
+
+        // 构建完整的 opencode.json 结构
+        let sync_data = serde_json::json!({
+            "$schema": "https://opencode.ai/config.json",
+            "theme": "tokyonight",
+            "autoupdate": false,
+            "provider": providers_map,
+            "tools": {
+                "get-current-session-id": true,
+                "webfetch": true
+            },
+            "agent": {},
+            "mcp": {}
+        });
+
+        let content = serde_json::to_string_pretty(&sync_data)
+            .map_err(|e| format!("序列化同步数据失败: {}", e))?;
+
+        fs::write(&self.opencode_json, content)
+            .map_err(|e| format!("写入 ~/.opencode/opencode.json 失败: {}", e))
+    }
+
     /// 同步配置到项目级 .opencode/opencode.json
     pub fn sync_to_project(&self, active_config: &OpenCodeActiveConfig) -> Result<(), String> {
         // 获取当前工作目录
@@ -303,5 +348,57 @@ impl OpenCodeConfigManager {
 
         fs::write(&project_opencode_json, content)
             .map_err(|e| format!("写入 .opencode/opencode.json 失败: {}", e))
+    }
+
+    /// 同步多个Provider配置到项目级 .opencode/opencode.json
+    pub fn sync_multiple_providers_to_project(&self, provider_names: &[String]) -> Result<(), String> {
+        // 获取当前工作目录
+        let current_dir = std::env::current_dir()
+            .map_err(|e| format!("获取当前目录失败: {}", e))?;
+
+        let project_opencode_dir = current_dir.join(".opencode");
+        let project_opencode_json = project_opencode_dir.join("opencode.json");
+
+        // 确保 .opencode 目录存在
+        if !project_opencode_dir.exists() {
+            fs::create_dir_all(&project_opencode_dir)
+                .map_err(|e| format!("创建项目 .opencode 目录失败: {}", e))?;
+        }
+
+        // 读取完整的 provider 配置
+        let opencode_config = self.read_config()?;
+
+        // 构建 provider 对象（包含所有指定的 provider）
+        let mut providers_map = serde_json::Map::new();
+
+        for provider_name in provider_names {
+            if let Some(provider) = opencode_config.get_provider(provider_name) {
+                providers_map.insert(
+                    provider_name.clone(),
+                    serde_json::to_value(provider)
+                        .map_err(|e| format!("序列化 Provider '{}' 失败: {}", provider_name, e))?,
+                );
+            }
+        }
+
+        // 构建完整的 opencode.json 结构
+        let sync_data = serde_json::json!({
+            "$schema": "https://opencode.ai/config.json",
+            "theme": "tokyonight",
+            "autoupdate": false,
+            "provider": providers_map,
+            "tools": {
+                "get-current-session-id": true,
+                "webfetch": true
+            },
+            "agent": {},
+            "mcp": {}
+        });
+
+        let content = serde_json::to_string_pretty(&sync_data)
+            .map_err(|e| format!("序列化同步数据失败: {}", e))?;
+
+        fs::write(&project_opencode_json, content)
+            .map_err(|e| format!("写入项目 .opencode/opencode.json 失败: {}", e))
     }
 }
