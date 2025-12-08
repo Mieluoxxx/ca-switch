@@ -212,6 +212,7 @@ impl OpenCodeConfigManager {
     // ========================================================================
 
     /// 同步配置到 OpenCode 官方配置文件 (生成完整的 opencode.json)
+    #[allow(dead_code)]
     pub fn sync_to_opencode(&self, active_config: &OpenCodeActiveConfig) -> Result<(), String> {
         // 确保 ~/.opencode 目录存在
         if !self.opencode_dir.exists() {
@@ -301,6 +302,7 @@ impl OpenCodeConfigManager {
     }
 
     /// 同步配置到项目级 .opencode/opencode.json
+    #[allow(dead_code)]
     pub fn sync_to_project(&self, active_config: &OpenCodeActiveConfig) -> Result<(), String> {
         // 获取当前工作目录
         let current_dir = std::env::current_dir()

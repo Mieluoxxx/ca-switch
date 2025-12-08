@@ -332,6 +332,7 @@ impl ConfigManager {
     }
 
     /// 切换 OpenCode 配置(简化版:只需指定Provider)
+    #[allow(dead_code)]
     pub fn switch_opencode_config(&mut self, provider: &str) -> Result<(), String> {
         // 1. 验证 Provider 是否存在
         let opencode_config = self.opencode_manager.read_config()?;
@@ -359,6 +360,7 @@ impl ConfigManager {
     }
 
     /// 应用 OpenCode 配置到项目级
+    #[allow(dead_code)]
     pub fn apply_opencode_to_project(&mut self, provider: &str) -> Result<(), String> {
         // 1. 验证 Provider 是否存在
         let opencode_config = self.opencode_manager.read_config()?;

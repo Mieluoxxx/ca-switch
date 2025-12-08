@@ -55,14 +55,6 @@ impl ClaudeCommand {
                         self.wait_for_back();
                     }
                 }
-                ApiMenuChoice::DetectSite | ApiMenuChoice::DetectModel => {
-                    show_error("该功能仅适用于 OpenCode");
-                    self.wait_for_back();
-                }
-                ApiMenuChoice::Apply => {
-                    show_error("该功能仅适用于 OpenCode");
-                    self.wait_for_back();
-                }
                 ApiMenuChoice::Back => break,
             }
         }
