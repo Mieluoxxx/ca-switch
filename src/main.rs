@@ -3,7 +3,7 @@ mod commands;
 mod config;
 mod error;
 mod tui;
-mod ui;
+mod utils;
 
 use clap::Parser;
 use cli::{Cli, Commands, ExportType};
@@ -14,15 +14,6 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Some(Commands::OpenCode) => {
-            // 传统交互式菜单模式 (兼容)
-            let mut cmd = commands::OpenCodeCommand::new()?;
-            cmd.execute()?;
-        }
-        Some(Commands::Backup) => {
-            let mut cmd = commands::BackupCommand::new()?;
-            cmd.execute().await?;
-        }
         Some(Commands::Status) => {
             show_status()?;
         }
@@ -49,7 +40,7 @@ async fn main() -> Result<()> {
 fn show_status() -> Result<()> {
     use console::style;
     use config::ConfigManager;
-    use ui::show_info;
+    use utils::show_info;
 
     println!("\n{}", style("📊 当前配置状态").cyan().bold());
     println!("{}", style("═".repeat(40)).dim());
@@ -73,37 +64,10 @@ fn show_status() -> Result<()> {
     Ok(())
 }
 
-/// 显示帮助
-#[allow(dead_code)]
-fn show_help() -> Result<()> {
-    use console::style;
-
-    println!("\n{}", style("❓ 帮助文档").cyan().bold());
-    println!("{}", style("═".repeat(40)).dim());
-
-    println!("\n{}", style("使用方法:").white().bold());
-    println!("  ca-switch [COMMAND]");
-
-    println!("\n{}", style("可用命令:").white().bold());
-    println!("  opencode OpenCode 配置管理");
-    println!("  backup   备份与恢复");
-    println!("  status   查看当前状态");
-    println!("  help     显示帮助信息");
-
-    println!("\n{}", style("不带任何参数运行时将进入交互式菜单").dim());
-
-    println!("\n{}", style("更多信息:").white().bold());
-    println!("  使用 'ca-switch --help' 查看详细帮助");
-    println!("  使用 'ca-switch <COMMAND> --help' 查看子命令帮助");
-
-    println!();
-    Ok(())
-}
-
 /// 导出 OpenCode 配置到当前目录
 fn export_opencode_config() -> Result<()> {
     use console::style;
-    use ui::{show_error, show_info, show_success};
+    use utils::{show_error, show_info, show_success};
 
     println!("\n{}", style("📤 导出 OpenCode 配置").cyan().bold());
     println!("{}", style("═".repeat(40)).dim());

@@ -158,7 +158,7 @@ impl InputForm {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(theme.active_border_style())
-            .title(format!(" {} ", self.title));
+            .title(Span::styled(format!(" {} ", self.title), theme.title_style()));
 
         let inner = block.inner(popup_area);
         frame.render_widget(block, popup_area);

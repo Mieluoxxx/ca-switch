@@ -26,6 +26,10 @@ pub fn handle_key_event(app: &mut App, key: KeyEvent) -> bool {
         return handle_apply_dialog(app, key);
     }
 
+    if app.apply_scope_dialog.visible {
+        return handle_apply_scope_dialog(app, key);
+    }
+
     // 处理表单输入
     if app.provider_form.visible {
         return handle_provider_form(app, key);
@@ -125,6 +129,25 @@ fn handle_apply_dialog(app: &mut App, key: KeyEvent) -> bool {
     }
 }
 
+/// 处理应用范围选择对话框
+fn handle_apply_scope_dialog(app: &mut App, key: KeyEvent) -> bool {
+    match key.code {
+        KeyCode::Left | KeyCode::Right | KeyCode::Tab | KeyCode::Char('h') | KeyCode::Char('l') => {
+            app.apply_scope_dialog.toggle_option();
+            true
+        }
+        KeyCode::Enter => {
+            app.execute_apply_config();
+            true
+        }
+        KeyCode::Esc | KeyCode::Char('q') => {
+            app.apply_scope_dialog.hide();
+            true
+        }
+        _ => true,
+    }
+}
+
 /// 处理 Provider 表单输入
 fn handle_provider_form(app: &mut App, key: KeyEvent) -> bool {
     match key.code {
@@ -218,6 +241,11 @@ fn handle_tab_specific_key(app: &mut App, key: KeyEvent) -> bool {
 
 /// Provider Tab 按键处理
 fn handle_provider_tab_key(app: &mut App, key: KeyEvent) -> bool {
+    // 如果处于多选应用模式，优先处理多选相关的按键
+    if app.is_multi_apply_mode {
+        return handle_multi_apply_mode(app, key);
+    }
+
     match key.code {
         // 导航
         KeyCode::Down | KeyCode::Char('j') => {
@@ -243,14 +271,51 @@ fn handle_provider_tab_key(app: &mut App, key: KeyEvent) -> bool {
             app.open_delete_dialog();
             true
         }
-        // 检测站点
-        KeyCode::Char('t') => {
-            app.show_info("检测站点功能开发中...");
+        // 应用配置 - 进入多选模式
+        KeyCode::Enter => {
+            app.enter_multi_apply_mode();
             true
         }
-        // 应用配置
+        _ => false,
+    }
+}
+
+/// 多选应用模式按键处理
+fn handle_multi_apply_mode(app: &mut App, key: KeyEvent) -> bool {
+    match key.code {
+        // 导航
+        KeyCode::Down | KeyCode::Char('j') => {
+            app.select_next_multi_apply();
+            true
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.select_prev_multi_apply();
+            true
+        }
+        // 切换选择状态
+        KeyCode::Char(' ') => {
+            app.toggle_provider_selection();
+            true
+        }
+        // 确认选择，打开应用范围对话框
         KeyCode::Enter => {
-            app.open_apply_dialog();
+            app.confirm_selected_providers();
+            true
+        }
+        // 取消多选模式
+        KeyCode::Esc => {
+            app.exit_multi_apply_mode();
+            true
+        }
+        // 快捷键：全选
+        KeyCode::Char('A') => {
+            // 选择所有 Provider
+            app.selected_providers = app.providers.clone();
+            true
+        }
+        // 快捷键：清空选择
+        KeyCode::Char('c') => {
+            app.selected_providers.clear();
             true
         }
         _ => false,

@@ -28,9 +28,9 @@ impl Theme {
             info: Color::Blue,
             bg: Color::Reset,
             fg: Color::White,
-            border: Color::DarkGray,
+            border: Color::LightGreen,
             highlight: Color::Yellow,
-            muted: Color::DarkGray,
+            muted: Color::LightGreen,
         }
     }
 

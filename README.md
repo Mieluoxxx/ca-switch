@@ -18,9 +18,6 @@ cargo install ca-switch
 # TUI 交互式界面（默认）
 ca-switch
 
-# 配置管理
-ca-switch opencode # OpenCode 传统菜单模式
-
 # 其他
 ca-switch backup   # 备份恢复
 ca-switch status   # 查看状态

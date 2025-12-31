@@ -245,11 +245,14 @@ impl MultiSelectDialog {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(theme.active_border_style())
-            .title(format!(
-                " {} ({}/{}) ",
-                self.title,
-                self.selected.len(),
-                self.items.len()
+            .title(Span::styled(
+                format!(
+                    " {} ({}/{}) ",
+                    self.title,
+                    self.selected.len(),
+                    self.items.len()
+                ),
+                theme.title_style(),
             ));
 
         let inner = block.inner(popup_area);
@@ -294,7 +297,7 @@ impl MultiSelectDialog {
         let search_block = Block::default()
             .borders(Borders::ALL)
             .border_style(search_style)
-            .title(" / 搜索 ");
+            .title(Span::styled(" / 搜索 ", theme.title_style()));
 
         let search_inner = search_block.inner(chunks[0]);
         frame.render_widget(search_block, chunks[0]);

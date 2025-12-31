@@ -23,18 +23,15 @@ ratatui = "0.29"
 crossterm = "0.28"
 tui-input = "0.11"
 
-# 交互式界面 (保留用于兼容，后续移除)
+# CLI 交互工具
 dialoguer = "0.11"
 console = "0.15"
-indicatif = "0.17"
 
 # 异步运行时
 tokio = { version = "1.41", features = ["full"] }
 
-# HTTP 客户端 (WebDAV)
+# HTTP 客户端 (用于站点检测)
 reqwest = { version = "0.12", features = ["json", "stream"] }
-base64 = "0.22"  # Base64 编码（用于 WebDAV 认证）
-quick-xml = "0.37"  # XML 解析（用于 WebDAV 响应）
 
 # 序列化
 serde = { version = "1.0", features = ["derive"] }

@@ -13,13 +13,6 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// OpenCode 配置管理
-    #[command(name = "opencode")]
-    OpenCode,
-
-    /// 备份与恢复
-    Backup,
-
     /// 查看当前状态
     Status,
 

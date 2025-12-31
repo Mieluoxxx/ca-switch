@@ -91,56 +91,6 @@ impl ConfigManager {
         }
     }
 
-    /// 切换 OpenCode 配置(简化版:只需指定Provider)
-    #[allow(dead_code)]
-    pub fn switch_opencode_config(&mut self, provider: &str) -> Result<(), String> {
-        // 1. 验证 Provider 是否存在
-        let opencode_config = self.opencode_manager.read_config()?;
-
-        if opencode_config.get_provider(provider).is_none() {
-            return Err(format!("Provider '{}' 不存在", provider));
-        }
-
-        // 2. 创建激活引用
-        let reference = OpenCodeActiveReference {
-            provider: provider.to_string(),
-        };
-
-        // 3. 更新全局配置
-        let mut global_config = self.read_global_config()?;
-        global_config.active.opencode = Some(reference.clone());
-        global_config.update_timestamp();
-        self.write_global_config(&global_config)?;
-
-        // 4. 构建完整配置并同步到 ~/.opencode/
-        let active_config = OpenCodeActiveConfig::from_reference(&reference, &opencode_config)?;
-        self.opencode_manager.sync_to_opencode(&active_config)?;
-
-        Ok(())
-    }
-
-    /// 应用 OpenCode 配置到项目级
-    #[allow(dead_code)]
-    pub fn apply_opencode_to_project(&mut self, provider: &str) -> Result<(), String> {
-        // 1. 验证 Provider 是否存在
-        let opencode_config = self.opencode_manager.read_config()?;
-
-        if opencode_config.get_provider(provider).is_none() {
-            return Err(format!("Provider '{}' 不存在", provider));
-        }
-
-        // 2. 创建激活引用
-        let reference = OpenCodeActiveReference {
-            provider: provider.to_string(),
-        };
-
-        // 3. 构建完整配置并同步到项目 .opencode/
-        let active_config = OpenCodeActiveConfig::from_reference(&reference, &opencode_config)?;
-        self.opencode_manager.sync_to_project(&active_config)?;
-
-        Ok(())
-    }
-
     /// 应用多个 OpenCode Provider 配置到全局
     pub fn apply_multiple_opencode_to_global(&mut self, provider_names: &[String]) -> Result<(), String> {
         // 1. 验证所有 Provider 是否存在
@@ -152,7 +102,7 @@ impl ConfigManager {
             }
         }
 
-        // 2. 更新全局配置（只记录第一个provider为激活状态，保持兼容性）
+        // 2. 更新全局配置（记录第一个provider为激活状态）
         if let Some(first_provider) = provider_names.first() {
             let reference = OpenCodeActiveReference {
                 provider: first_provider.clone(),

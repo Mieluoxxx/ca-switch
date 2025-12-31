@@ -96,6 +96,7 @@ pub struct OpenCodeProvider {
     pub metadata: ProviderMetadata,
     // 站点检测结果 (持久化缓存，不同步到 opencode.json)
     #[serde(skip)]
+    #[allow(dead_code)]
     pub site_detection: Option<SiteDetectionResult>,
 }
 
@@ -127,6 +128,7 @@ pub struct OpenCodeModelInfo {
     pub limit: Option<OpenCodeModelLimit>,
     // 模型检测结果 (持久化缓存，不同步到 opencode.json)
     #[serde(skip)]
+    #[allow(dead_code)]
     pub model_detection: Option<ModelDetectionResult>,
 }
 
@@ -218,22 +220,10 @@ impl OpenCodeProvider {
         }
     }
 
-    /// 获取 API Key
-    #[allow(dead_code)]
-    pub fn get_api_key(&self) -> &String {
-        &self.options.api_key
-    }
-
     /// 更新 API Key
     pub fn set_api_key(&mut self, api_key: String) {
         self.options.api_key = api_key;
         self.update_timestamp();
-    }
-
-    /// 获取 Base URL
-    #[allow(dead_code)]
-    pub fn get_base_url(&self) -> &String {
-        &self.options.base_url
     }
 
     /// 更新 Base URL

@@ -49,6 +49,9 @@ pub fn render(frame: &mut Frame, app: &mut App, theme: &Theme) {
     // 应用配置对话框
     app.apply_dialog.render(frame, theme, full_area);
 
+    // 应用范围选择对话框
+    app.apply_scope_dialog.render(frame, theme, full_area);
+
     // Model 删除对话框
     app.model_delete_dialog.render(frame, theme, full_area);
 
@@ -104,7 +107,7 @@ fn render_tabs(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
             Block::default()
                 .borders(Borders::ALL)
                 .border_style(theme.border_style())
-                .title(" 功能模块 "),
+                .title(Span::styled(" 功能模块 ", theme.title_style())),
         )
         .select(app.current_tab.index())
         .highlight_style(
@@ -139,9 +142,16 @@ fn render_providers_tab(frame: &mut Frame, app: &mut App, theme: &Theme, area: R
         .providers
         .iter()
         .map(|name| {
+            let is_selected = app.is_provider_selected(name);
+            let prefix = if is_selected { "☑" } else { "🔌" };
+            let name_style = if is_selected {
+                Style::default().fg(theme.success)
+            } else {
+                Style::default().fg(theme.fg)
+            };
             ListItem::new(Line::from(vec![
-                Span::raw(" 🔌 "),
-                Span::styled(name.clone(), Style::default().fg(theme.fg)),
+                Span::raw(format!(" {} ", prefix)),
+                Span::styled(name.clone(), name_style),
             ]))
         })
         .collect();
@@ -151,66 +161,130 @@ fn render_providers_tab(frame: &mut Frame, app: &mut App, theme: &Theme, area: R
             Block::default()
                 .borders(Borders::ALL)
                 .border_style(theme.active_border_style())
-                .title(format!(" Providers ({}) ", app.providers.len())),
+                .title(format!(
+                    " Providers ({}/{}) ",
+                    app.get_selected_count(),
+                    app.get_provider_count()
+                )),
         )
         .highlight_style(theme.highlight_style())
         .highlight_symbol("▶ ");
 
-    frame.render_stateful_widget(list, chunks[0], &mut app.provider_list_state);
+    // 根据是否在多选模式选择不同的列表状态
+    if app.is_multi_apply_mode {
+        frame.render_stateful_widget(list, chunks[0], &mut app.multi_apply_list_state);
+    } else {
+        frame.render_stateful_widget(list, chunks[0], &mut app.provider_list_state);
+    }
 
     // 右侧: Provider 详情
     let detail_block = Block::default()
         .borders(Borders::ALL)
-        .border_style(theme.border_style())
-        .title(" Provider 详情 ");
+        .border_style(theme.border_style());
+
+    // 根据是否在多选模式显示不同的标题
+    let title = if app.is_multi_apply_mode {
+        format!(
+            " 多选应用模式 (按 [Space] 切换选择, [Enter] 确认, [Esc] 取消) "
+        )
+    } else {
+        " Provider 详情 ".to_string()
+    };
+
+    let detail_block = detail_block.title(Span::styled(title, theme.title_style()));
 
     let inner = detail_block.inner(chunks[1]);
     frame.render_widget(detail_block, chunks[1]);
 
-    if let Some(provider_name) = app.get_selected_provider() {
-        if let Ok(Some(provider)) = app.config_manager.opencode().get_provider(provider_name) {
-            let details = vec![
-                Line::from(vec![
-                    Span::styled("名称: ", Style::default().add_modifier(Modifier::BOLD)),
-                    Span::raw(provider_name),
-                ]),
-                Line::from(vec![
-                    Span::styled("URL: ", Style::default().add_modifier(Modifier::BOLD)),
-                    Span::styled(&provider.options.base_url, theme.muted_style()),
-                ]),
-                Line::from(vec![
-                    Span::styled("模型数: ", Style::default().add_modifier(Modifier::BOLD)),
-                    Span::styled(
-                        provider.models.len().to_string(),
-                        Style::default().fg(theme.success),
-                    ),
-                ]),
-                Line::from(""),
-                Line::from(Span::styled(
-                    "可用模型:",
-                    Style::default().add_modifier(Modifier::BOLD),
-                )),
-            ];
+    if app.is_multi_apply_mode {
+        // 多选模式下的详情显示
+        if let Some(provider_name) = app.get_multi_apply_current() {
+            if let Ok(Some(provider)) = app.config_manager.opencode().get_provider(provider_name) {
+                let is_selected = app.is_provider_selected(provider_name);
+                let status = if is_selected { "✓ 已选择" } else { "○ 未选择" };
 
-            let mut all_lines = details;
-            // 排序模型名称以保持稳定的显示顺序
-            let mut model_names: Vec<&String> = provider.models.keys().collect();
-            model_names.sort();
-            for model_name in model_names {
-                all_lines.push(Line::from(vec![
-                    Span::raw("  • "),
-                    Span::styled(model_name, Style::default().fg(theme.info)),
-                ]));
+                let details = vec![
+                    Line::from(vec![
+                        Span::styled("当前项: ", Style::default().add_modifier(Modifier::BOLD)),
+                        Span::styled(provider_name, Style::default().fg(theme.primary)),
+                        Span::styled(format!("  [{}]", status), theme.success_style()),
+                    ]),
+                    Line::from(vec![
+                        Span::styled("URL: ", Style::default().add_modifier(Modifier::BOLD)),
+                        Span::styled(&provider.options.base_url, theme.muted_style()),
+                    ]),
+                    Line::from(vec![
+                        Span::styled("模型数: ", Style::default().add_modifier(Modifier::BOLD)),
+                        Span::styled(
+                            provider.models.len().to_string(),
+                            Style::default().fg(theme.success),
+                        ),
+                    ]),
+                    Line::from(""),
+                    Line::from(Span::styled(
+                        "快捷键:",
+                        Style::default().add_modifier(Modifier::BOLD),
+                    )),
+                    Line::from("  [Space] 切换选择    [↑/k] 上移    [↓/j] 下移"),
+                    Line::from("  [Enter] 确认应用    [Esc] 取消    [A] 全选    [C] 清空"),
+                ];
+
+                let paragraph = Paragraph::new(details).wrap(Wrap { trim: true });
+                frame.render_widget(paragraph, inner);
             }
-
-            let paragraph = Paragraph::new(all_lines).wrap(Wrap { trim: true });
-            frame.render_widget(paragraph, inner);
+        } else {
+            let empty = Paragraph::new("没有 Provider")
+                .style(theme.muted_style())
+                .wrap(Wrap { trim: true });
+            frame.render_widget(empty, inner);
         }
     } else {
-        let empty = Paragraph::new("选择一个 Provider 查看详情")
-            .style(theme.muted_style())
-            .wrap(Wrap { trim: true });
-        frame.render_widget(empty, inner);
+        // 普通模式下的详情显示
+        if let Some(provider_name) = app.get_selected_provider() {
+            if let Ok(Some(provider)) = app.config_manager.opencode().get_provider(provider_name) {
+                let details = vec![
+                    Line::from(vec![
+                        Span::styled("名称: ", Style::default().add_modifier(Modifier::BOLD)),
+                        Span::raw(provider_name),
+                    ]),
+                    Line::from(vec![
+                        Span::styled("URL: ", Style::default().add_modifier(Modifier::BOLD)),
+                        Span::styled(&provider.options.base_url, theme.muted_style()),
+                    ]),
+                    Line::from(vec![
+                        Span::styled("模型数: ", Style::default().add_modifier(Modifier::BOLD)),
+                        Span::styled(
+                            provider.models.len().to_string(),
+                            Style::default().fg(theme.success),
+                        ),
+                    ]),
+                    Line::from(""),
+                    Line::from(Span::styled(
+                        "可用模型:",
+                        Style::default().add_modifier(Modifier::BOLD),
+                    )),
+                ];
+
+                let mut all_lines = details;
+                // 排序模型名称以保持稳定的显示顺序
+                let mut model_names: Vec<&String> = provider.models.keys().collect();
+                model_names.sort();
+                for model_name in model_names {
+                    all_lines.push(Line::from(vec![
+                        Span::raw("  • "),
+                        Span::styled(model_name, Style::default().fg(theme.info)),
+                    ]));
+                }
+
+                let paragraph = Paragraph::new(all_lines).wrap(Wrap { trim: true });
+                frame.render_widget(paragraph, inner);
+            }
+        } else {
+            let empty = Paragraph::new("选择一个 Provider 查看详情")
+                .style(theme.muted_style())
+                .wrap(Wrap { trim: true });
+            frame.render_widget(empty, inner);
+        }
     }
 }
 
@@ -286,7 +360,7 @@ fn render_models_tab(frame: &mut Frame, app: &mut App, theme: &Theme, area: Rect
         let search_block = Block::default()
             .borders(Borders::ALL)
             .border_style(search_border)
-            .title(" / 搜索 ");
+            .title(Span::styled(" / 搜索 ", theme.title_style()));
 
         let search_inner = search_block.inner(right_chunks[0]);
         frame.render_widget(search_block, right_chunks[0]);
@@ -371,7 +445,7 @@ fn render_backup_tab(frame: &mut Frame, _app: &mut App, theme: &Theme, area: Rec
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(theme.border_style())
-        .title(" 💾 备份与恢复 ");
+        .title(Span::styled(" 💾 备份与恢复 ", theme.title_style()));
 
     let inner = block.inner(chunks[0]);
     frame.render_widget(block, chunks[0]);
@@ -415,7 +489,7 @@ fn render_backup_tab(frame: &mut Frame, _app: &mut App, theme: &Theme, area: Rec
     let hint_block = Block::default()
         .borders(Borders::ALL)
         .border_style(theme.border_style())
-        .title(" 💡 提示 ");
+        .title(Span::styled(" 💡 提示 ", theme.title_style()));
 
     let hint_inner = hint_block.inner(chunks[1]);
     frame.render_widget(hint_block, chunks[1]);
@@ -447,7 +521,7 @@ fn render_status_tab(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
     let status_block = Block::default()
         .borders(Borders::ALL)
         .border_style(theme.border_style())
-        .title(" 📊 配置概览 ");
+        .title(Span::styled(" 📊 配置概览 ", theme.title_style()));
 
     let status_inner = status_block.inner(chunks[0]);
     frame.render_widget(status_block, chunks[0]);
@@ -515,7 +589,7 @@ fn render_status_tab(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
     let log_block = Block::default()
         .borders(Borders::ALL)
         .border_style(theme.border_style())
-        .title(format!(" 📝 操作日志 ({}) ", app.operation_logs.len()));
+        .title(Span::styled(format!(" 📝 操作日志 ({}) ", app.operation_logs.len()), theme.title_style()));
 
     let log_inner = log_block.inner(chunks[1]);
     frame.render_widget(log_block, chunks[1]);
@@ -556,7 +630,11 @@ fn render_status_tab(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
 fn render_footer(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
     let shortcuts = match app.current_tab {
         AppTab::Providers => {
-            "[j/↓]下移 [k/↑]上移 [Enter]应用 [a]添加 [e]编辑 [d]删除 [t]检测"
+            if app.is_multi_apply_mode {
+                "[j/↓]下移 [k/↑]上移 [Space]选择 [Enter]确认 [A]全选 [C]清空 [Esc]取消"
+            } else {
+                "[j/↓]下移 [k/↑]上移 [Enter]应用 [a]添加 [e]编辑 [d]删除"
+            }
         }
         AppTab::Models => "[h/l]切换面板 [j/k]导航 [Enter]选择 [a]添加 [d]删除 [/]搜索 [t]获取模型",
         AppTab::Backup => "[b]备份 [r]恢复 [d]删除",
@@ -566,7 +644,7 @@ fn render_footer(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(theme.border_style())
-        .title(" 快捷键 ");
+        .title(Span::styled(" 快捷键 ", theme.title_style()));
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -652,7 +730,7 @@ fn render_help_popup(frame: &mut Frame, theme: &Theme, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(theme.active_border_style())
-        .title(" ❓ 帮助 - 按任意键关闭 ");
+        .title(Span::styled(" ❓ 帮助 - 按任意键关闭 ", theme.title_style()));
 
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
@@ -673,11 +751,20 @@ fn render_help_popup(frame: &mut Frame, theme: &Theme, area: Rect) {
         )),
         Line::from("  j / ↓         选择下一个"),
         Line::from("  k / ↑         选择上一个"),
-        Line::from("  Enter         应用选中的 Provider"),
+        Line::from("  Enter         应用配置（进入多选模式）"),
         Line::from("  a             添加新 Provider"),
         Line::from("  e             编辑选中的 Provider"),
         Line::from("  d             删除选中的 Provider"),
-        Line::from("  t             检测站点连接"),
+        Line::from(""),
+        Line::from(Span::styled(
+            "多选应用模式:",
+            Style::default().add_modifier(Modifier::BOLD),
+        )),
+        Line::from("  Space         切换选择状态"),
+        Line::from("  Enter         确认并选择应用范围"),
+        Line::from("  A             全选所有 Provider"),
+        Line::from("  C             清空选择"),
+        Line::from("  Esc           取消多选模式"),
         Line::from(""),
         Line::from(Span::styled(
             "Backup Tab:",

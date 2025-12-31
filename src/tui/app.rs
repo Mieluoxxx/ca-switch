@@ -6,7 +6,7 @@ use crate::config::ConfigManager;
 
 use super::{
     types::{AppTab, InputMode, LogEntry, MessageType, StatusMessage},
-    ui::{ConfirmDialog, FormField, InputForm, MultiSelectDialog},
+    ui::components::{ApplyScopeDialog, ConfirmDialog, FormField, InputForm, MultiSelectDialog},
 };
 
 /// Provider 表单类型
@@ -58,8 +58,10 @@ pub struct App {
     pub model_form: InputForm,
     /// 确认删除对话框
     pub delete_dialog: ConfirmDialog,
-    /// 应用配置对话框
+    /// 应用配置确认对话框
     pub apply_dialog: ConfirmDialog,
+    /// 应用范围选择对话框
+    pub apply_scope_dialog: ApplyScopeDialog,
     /// Model 删除对话框
     pub model_delete_dialog: ConfirmDialog,
     /// 模型多选对话框（获取站点模型时使用）
@@ -68,6 +70,14 @@ pub struct App {
     pub search_active: bool,
     /// 搜索关键词
     pub search_query: String,
+
+    // === 应用配置相关状态 ===
+    /// 是否处于多选应用模式
+    pub is_multi_apply_mode: bool,
+    /// 已选择的 Provider 列表
+    pub selected_providers: Vec<String>,
+    /// 多选模式下当前高亮项
+    pub multi_apply_list_state: ListState,
 
     // === 消息和日志 ===
     /// 状态栏消息
@@ -114,12 +124,19 @@ impl App {
         let apply_dialog = ConfirmDialog::new("应用配置", "确定要应用这个 Provider 的配置吗？")
             .with_buttons("应用", "取消");
 
+        // 创建应用范围选择对话框
+        let apply_scope_dialog = ApplyScopeDialog::new();
+
         // 创建 Model 删除对话框
         let model_delete_dialog = ConfirmDialog::new("确认删除", "确定要删除这个 Model 吗？")
             .with_buttons("删除", "取消");
 
         // 创建模型多选对话框
         let model_select_dialog = MultiSelectDialog::new("选择要添加的模型");
+
+        // 初始化多选应用模式的列表状态
+        let mut multi_apply_list_state = ListState::default();
+        multi_apply_list_state.select(Some(0));
 
         // 初始化 Model Tab 的 Provider 列表状态
         let mut model_provider_list_state = ListState::default();
@@ -143,10 +160,14 @@ impl App {
             model_form,
             delete_dialog,
             apply_dialog,
+            apply_scope_dialog,
             model_delete_dialog,
             model_select_dialog,
             search_active: false,
             search_query: String::new(),
+            is_multi_apply_mode: false,
+            selected_providers: Vec::new(),
+            multi_apply_list_state,
             status_message: None,
             operation_logs: Vec::new(),
         })
@@ -230,6 +251,10 @@ impl App {
     /// 显示信息消息
     pub fn show_info(&mut self, content: &str) {
         self.show_toast(content.to_string(), MessageType::Info);
+    }
+
+    pub fn show_warning(&mut self, content: &str) {
+        self.show_toast(content.to_string(), MessageType::Warning);
     }
 
     /// 记录操作日志
@@ -439,6 +464,7 @@ impl App {
     // === 应用配置对话框操作 ===
 
     /// 打开应用配置对话框
+    #[allow(dead_code)]
     pub fn open_apply_dialog(&mut self) {
         if let Some(name) = self.get_selected_provider() {
             self.apply_dialog.message = format!(
@@ -452,7 +478,7 @@ impl App {
     /// 确认应用配置
     pub fn confirm_apply_provider(&mut self) {
         if let Some(name) = self.get_selected_provider().cloned() {
-            match self.config_manager.apply_opencode_to_project(&name) {
+            match self.config_manager.apply_multiple_opencode_to_project(&vec![name.clone()]) {
                 Ok(_) => {
                     self.show_success(&format!("配置已应用: {}", name));
                     self.log_operation(format!("应用 Provider 配置: {}", name), MessageType::Success);
@@ -463,6 +489,176 @@ impl App {
             }
         }
         self.apply_dialog.hide();
+    }
+
+    // === 多选应用模式操作 ===
+
+    /// 进入多选应用模式
+    pub fn enter_multi_apply_mode(&mut self) {
+        if self.providers.is_empty() {
+            return;
+        }
+        self.is_multi_apply_mode = true;
+        self.selected_providers.clear();
+        // 默认选中当前高亮的 Provider
+        if let Some(idx) = self.provider_list_state.selected() {
+            if let Some(name) = self.providers.get(idx) {
+                self.selected_providers.push(name.clone());
+            }
+        }
+        self.multi_apply_list_state.select(Some(0));
+    }
+
+    /// 退出多选应用模式
+    pub fn exit_multi_apply_mode(&mut self) {
+        self.is_multi_apply_mode = false;
+        self.selected_providers.clear();
+    }
+
+    /// 在多选模式下切换当前 Provider 的选择状态
+    pub fn toggle_provider_selection(&mut self) {
+        if let Some(idx) = self.multi_apply_list_state.selected() {
+            if let Some(name) = self.providers.get(idx) {
+                if self.selected_providers.contains(name) {
+                    self.selected_providers.retain(|p| p != name);
+                } else {
+                    self.selected_providers.push(name.clone());
+                }
+            }
+        }
+    }
+
+    /// 多选模式下选择下一个 Provider
+    pub fn select_next_multi_apply(&mut self) {
+        if self.providers.is_empty() {
+            return;
+        }
+        let i = match self.multi_apply_list_state.selected() {
+            Some(i) => {
+                if i >= self.providers.len() - 1 {
+                    0
+                } else {
+                    i + 1
+                }
+            }
+            None => 0,
+        };
+        self.multi_apply_list_state.select(Some(i));
+    }
+
+    /// 多选模式下选择上一个 Provider
+    pub fn select_prev_multi_apply(&mut self) {
+        if self.providers.is_empty() {
+            return;
+        }
+        let i = match self.multi_apply_list_state.selected() {
+            Some(i) => {
+                if i == 0 {
+                    self.providers.len() - 1
+                } else {
+                    i - 1
+                }
+            }
+            None => 0,
+        };
+        self.multi_apply_list_state.select(Some(i));
+    }
+
+    /// 获取多选模式下当前高亮的 Provider 名称
+    pub fn get_multi_apply_current(&self) -> Option<&String> {
+        self.multi_apply_list_state
+            .selected()
+            .and_then(|i| self.providers.get(i))
+    }
+
+    /// 确认选择的 Provider，打开应用范围对话框
+    pub fn confirm_selected_providers(&mut self) {
+        if self.selected_providers.is_empty() {
+            self.show_warning("请先选择要应用的 Provider");
+            return;
+        }
+        // 显示所有选中的 Provider
+        self.apply_scope_dialog.show_multiple(&self.selected_providers);
+        self.is_multi_apply_mode = false;
+    }
+
+    /// 执行应用配置（从范围对话框确认后调用）
+    pub fn execute_apply_config(&mut self) {
+        if self.selected_providers.is_empty() {
+            return;
+        }
+
+        // 提取需要的值，避免借用冲突
+        let apply_to_global = self.apply_scope_dialog.apply_to_global;
+        let apply_to_project = self.apply_scope_dialog.apply_to_project;
+        let target_description = self.apply_scope_dialog.get_target_description();
+
+        let provider_names: Vec<String> = self.selected_providers.clone();
+
+        // 应用到全局
+        if apply_to_global {
+            match self
+                .config_manager
+                .apply_multiple_opencode_to_global(&provider_names)
+            {
+                Ok(_) => {
+                    self.show_success(&format!(
+                        "已应用到全局配置 ({} 个 Provider)",
+                        provider_names.len()
+                    ));
+                }
+                Err(e) => {
+                    self.show_error(&format!("应用到全局配置失败: {}", e));
+                }
+            }
+        }
+
+        // 应用到项目
+        if apply_to_project {
+            match self
+                .config_manager
+                .apply_multiple_opencode_to_project(&provider_names)
+            {
+                Ok(_) => {
+                    self.show_success(&format!(
+                        "已应用到当前项目 ({} 个 Provider)",
+                        provider_names.len()
+                    ));
+                }
+                Err(e) => {
+                    self.show_error(&format!("应用到项目失败: {}", e));
+                }
+            }
+        }
+
+        // 记录操作日志
+        self.log_operation(
+            format!(
+                "应用 {} 个 Provider 到: {}",
+                provider_names.len(),
+                target_description
+            ),
+            MessageType::Success,
+        );
+
+        // 清理状态
+        self.selected_providers.clear();
+        self.apply_scope_dialog.hide();
+    }
+
+    /// 获取已选择的 Provider 数量
+    pub fn get_selected_count(&self) -> usize {
+        self.selected_providers.len()
+    }
+
+    /// 获取 Provider 总数
+    pub fn get_provider_count(&self) -> usize {
+        self.providers.len()
+    }
+
+    /// 检查 Provider 是否被选中
+    pub fn is_provider_selected(&self, name: &str) -> bool {
+        self.selected_providers.contains(&name.to_string())
     }
 
     // === Model Tab 操作 ===
