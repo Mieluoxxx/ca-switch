@@ -53,7 +53,7 @@ impl WebDAVFile {
     /// 从文件名中提取分类和时间戳
     fn parse_filename(name: &str) -> (String, Option<chrono::DateTime<chrono::Local>>) {
         // 文件名格式: {category}_{timestamp}.json
-        // 例如: claude_20250101_120000.json
+        // 例如: opencode_20250101_120000.json
 
         let parts: Vec<&str> = name.trim_end_matches(".json").split('_').collect();
 

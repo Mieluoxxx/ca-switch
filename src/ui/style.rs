@@ -22,32 +22,6 @@ pub fn show_info(message: &str) {
     println!("{} {}", style("ℹ️ ").blue(), style(message).blue());
 }
 
-/// 显示启动 Banner
-pub fn show_banner(version: &str, has_update: bool) {
-    let banner = r#"
-   ___   _      ___        _ _      _
-  / __| /_\    / __|_ __ _(_) |_ __| |_
- | (__ / _ \   \__ \ V  V / |  _/ _| ' \
-  \___/_/ \_\  |___/\_/\_/|_|\__\__|_||_|
-"#;
-
-    let version_text = if has_update {
-        format!("{} {}",
-            style(format!("v{version}")).dim(),
-            style("(有更新)").yellow()
-        )
-    } else {
-        format!("{} {}",
-            style(format!("v{version}")).dim(),
-            style("(最新)").green()
-        )
-    };
-
-    println!("\n{}", style(banner).cyan().bold());
-    println!("  {}", style("Coding Agent 配置管理CLI工具").white());
-    println!("  {version_text}\n");
-}
-
 /// 确认操作
 pub fn confirm(message: &str, default: bool) -> crate::error::Result<bool> {
     Confirm::with_theme(&ColorfulTheme::default())
@@ -55,19 +29,6 @@ pub fn confirm(message: &str, default: bool) -> crate::error::Result<bool> {
         .default(default)
         .interact()
         .map_err(|_| crate::error::CliError::UserCancelled)
-}
-
-/// 等待返回确认
-#[allow(dead_code)]
-pub fn wait_for_back_confirm(message: &str) -> crate::error::Result<()> {
-    let items = vec!["⬅️  返回上一级菜单"];
-    Select::with_theme(&ColorfulTheme::default())
-        .with_prompt(message)
-        .items(&items)
-        .default(0)
-        .interact()
-        .map_err(|_| crate::error::CliError::UserCancelled)?;
-    Ok(())
 }
 
 /// OpenCode 菜单选项 (直接作为主菜单使用)
@@ -122,23 +83,4 @@ pub fn show_opencode_menu(title: &str) -> crate::error::Result<OpenCodeMenuChoic
         .map_err(|_| crate::error::CliError::UserCancelled)?;
 
     Ok(choices[selection])
-}
-
-/// 获取地区图标
-#[allow(dead_code)]
-pub fn get_region_icon(region_name: &str) -> &'static str {
-    let lower_name = region_name.to_lowercase();
-    if lower_name.contains("日本") || lower_name.contains("japan") {
-        "🇯🇵"
-    } else if lower_name.contains("新加坡") || lower_name.contains("singapore") {
-        "🇸🇬"
-    } else if lower_name.contains("美国") || lower_name.contains("usa") {
-        "🇺🇸"
-    } else if lower_name.contains("香港") || lower_name.contains("hongkong") {
-        "🇭🇰"
-    } else if lower_name.contains("大陆") || lower_name.contains("china") {
-        "🇨🇳"
-    } else {
-        "🌍"
-    }
 }

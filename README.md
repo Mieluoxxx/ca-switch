@@ -1,12 +1,9 @@
-# SiriusX Coding Agent Switch
+# ca-switch - OpenCode 配置管理工具
 
-多 AI 编程助手配置管理工具
+OpenCode 配置管理工具，支持多 Provider 和 Model 管理
 
 ## 支持
 
-- Claude Code
-- Codex
-- Gemini CLI
 - OpenCode
 
 ## 安装
@@ -18,14 +15,11 @@ cargo install ca-switch
 ## 使用
 
 ```bash
-# 交互式菜单
+# TUI 交互式界面（默认）
 ca-switch
 
 # 配置管理
-ca-switch claude   # Claude
-ca-switch codex    # Codex
-ca-switch gemini   # Gemini
-ca-switch opencode # OpenCode
+ca-switch opencode # OpenCode 传统菜单模式
 
 # 其他
 ca-switch backup   # 备份恢复
@@ -34,9 +28,10 @@ ca-switch status   # 查看状态
 
 ## 功能
 
-- 🔄 快速切换配置
-- 💾 WebDAV 云同步
-- 🎨 交互式界面
+- 🔄 多 Provider 配置管理
+- 🤖 模型列表管理与站点检测
+- 💾 WebDAV 云同步备份
+- 🎨 现代化 TUI 交互界面
 
 ## License
 

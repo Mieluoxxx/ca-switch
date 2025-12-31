@@ -1,7 +1,7 @@
-node_modules
+node_modules/
 package.json
 bun.lock
-.claude/
 target/
 .opencode/opencode.json
 Cargo.lock
+docs/

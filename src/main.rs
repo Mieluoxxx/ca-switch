@@ -2,12 +2,12 @@ mod cli;
 mod commands;
 mod config;
 mod error;
+mod tui;
 mod ui;
 
 use clap::Parser;
 use cli::{Cli, Commands, ExportType};
 use error::Result;
-use ui::Menu;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -15,6 +15,7 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Some(Commands::OpenCode) => {
+            // 传统交互式菜单模式 (兼容)
             let mut cmd = commands::OpenCodeCommand::new()?;
             cmd.execute()?;
         }
@@ -33,9 +34,11 @@ async fn main() -> Result<()> {
             }
         }
         None => {
-            // 没有子命令时，显示交互式菜单
-            let mut menu = Menu::new();
-            menu.run().await?;
+            // 没有子命令时，启动 TUI 界面
+            if let Err(e) = tui::run() {
+                eprintln!("TUI 错误: {}", e);
+                std::process::exit(1);
+            }
         }
     }
 
