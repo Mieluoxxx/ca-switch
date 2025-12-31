@@ -25,10 +25,10 @@ pub fn show_info(message: &str) {
 /// 显示启动 Banner
 pub fn show_banner(version: &str, has_update: bool) {
     let banner = r#"
-   ___  ___   ___ _    ___
-  / __|/ __| / __| |  |_ _|
- | (__| (__  | (__| |__ | |
-  \___|\___|  \___|____|___|
+   ___   _      ___        _ _      _
+  / __| /_\    / __|_ __ _(_) |_ __| |_
+ | (__ / _ \   \__ \ V  V / |  _/ _| ' \
+  \___/_/ \_\  |___/\_/\_/|_|\__\__|_||_|
 "#;
 
     let version_text = if has_update {
@@ -44,101 +44,8 @@ pub fn show_banner(version: &str, has_update: bool) {
     };
 
     println!("\n{}", style(banner).cyan().bold());
-    println!("  {}", style("Claude Code配置管理CLI工具").white());
+    println!("  {}", style("Coding Agent 配置管理CLI工具").white());
     println!("  {version_text}\n");
-}
-
-/// 主菜单选项
-#[derive(Debug, Clone, Copy)]
-pub enum MainMenuChoice {
-    Api,
-    CodexApi,
-    GeminiApi,
-    OpenCodeApi,
-    Backup,
-    Exit,
-}
-
-impl fmt::Display for MainMenuChoice {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            MainMenuChoice::Api => write!(f, "📡 ClaudeCode"),
-            MainMenuChoice::CodexApi => write!(f, "💻 Codex"),
-            MainMenuChoice::GeminiApi => write!(f, "🌟 Gemini-cli"),
-            MainMenuChoice::OpenCodeApi => write!(f, "🚀 OpenCode"),
-            MainMenuChoice::Backup => write!(f, "🔄 Backup"),
-            MainMenuChoice::Exit => write!(f, "🚪 Exit"),
-        }
-    }
-}
-
-/// 显示主菜单
-pub fn show_main_menu() -> crate::error::Result<MainMenuChoice> {
-    let choices = [
-        MainMenuChoice::OpenCodeApi,
-        MainMenuChoice::Api,
-        MainMenuChoice::CodexApi,
-        MainMenuChoice::GeminiApi,
-        MainMenuChoice::Backup,
-        MainMenuChoice::Exit,
-    ];
-
-    let selection = Select::with_theme(&ColorfulTheme::default())
-        .with_prompt("请选择功能模块")
-        .items(&choices)
-        .default(0)
-        .interact()
-        .map_err(|_| crate::error::CliError::UserCancelled)?;
-
-    Ok(choices[selection])
-}
-
-/// API 菜单选项 (ClaudeCode/Codex/Gemini 通用)
-#[derive(Debug, Clone, Copy)]
-pub enum ApiMenuChoice {
-    Switch,
-    List,
-    Add,
-    Edit,
-    Delete,
-    Back,
-}
-
-impl fmt::Display for ApiMenuChoice {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ApiMenuChoice::Switch => write!(f, "🔄 切换配置 - 切换API配置"),
-            ApiMenuChoice::List => write!(f, "📋 查看配置 - 列出所有配置"),
-            ApiMenuChoice::Add => write!(f, "➕ 添加配置 - 添加新的API配置"),
-            ApiMenuChoice::Edit => write!(f, "📝 编辑配置 - 修改现有配置"),
-            ApiMenuChoice::Delete => write!(f, "❌ 删除配置 - 删除API配置"),
-            ApiMenuChoice::Back => write!(f, "⬅️  返回上一级菜单"),
-        }
-    }
-}
-
-/// 显示 API 菜单 (ClaudeCode/Codex/Gemini 通用菜单，不包含 OpenCode 专属功能)
-pub fn show_api_menu(title: &str) -> crate::error::Result<ApiMenuChoice> {
-    println!("\n{}", style(title).cyan().bold());
-    println!("{}", style("═".repeat(40)).dim());
-
-    let choices = [
-        ApiMenuChoice::Switch,
-        ApiMenuChoice::List,
-        ApiMenuChoice::Add,
-        ApiMenuChoice::Edit,
-        ApiMenuChoice::Delete,
-        ApiMenuChoice::Back,
-    ];
-
-    let selection = Select::with_theme(&ColorfulTheme::default())
-        .with_prompt("请选择操作")
-        .items(&choices)
-        .default(0)
-        .interact()
-        .map_err(|_| crate::error::CliError::UserCancelled)?;
-
-    Ok(choices[selection])
 }
 
 /// 确认操作
@@ -163,8 +70,8 @@ pub fn wait_for_back_confirm(message: &str) -> crate::error::Result<()> {
     Ok(())
 }
 
-/// OpenCode 菜单选项 (去除 Switch 和 List)
-#[derive(Debug, Clone, Copy)]
+/// OpenCode 菜单选项 (直接作为主菜单使用)
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum OpenCodeMenuChoice {
     Apply,
     Add,
@@ -172,7 +79,8 @@ pub enum OpenCodeMenuChoice {
     Delete,
     DetectSite,
     DetectModel,
-    Back,
+    Backup,
+    Exit,
 }
 
 impl fmt::Display for OpenCodeMenuChoice {
@@ -184,12 +92,13 @@ impl fmt::Display for OpenCodeMenuChoice {
             OpenCodeMenuChoice::Delete => write!(f, "❌ 删除配置 - 删除API配置"),
             OpenCodeMenuChoice::DetectSite => write!(f, "🌐 站点检测 - 检测站点并获取模型列表"),
             OpenCodeMenuChoice::DetectModel => write!(f, "🤖 模型检测 - 测试模型性能和可用性"),
-            OpenCodeMenuChoice::Back => write!(f, "⬅️  返回上一级菜单"),
+            OpenCodeMenuChoice::Backup => write!(f, "🔄 备份管理 - 管理配置备份"),
+            OpenCodeMenuChoice::Exit => write!(f, "🚪 退出程序"),
         }
     }
 }
 
-/// 显示 OpenCode 专用菜单
+/// 显示 OpenCode 专用菜单 (现在作为主菜单使用)
 pub fn show_opencode_menu(title: &str) -> crate::error::Result<OpenCodeMenuChoice> {
     println!("\n{}", style(title).cyan().bold());
     println!("{}", style("═".repeat(40)).dim());
@@ -201,7 +110,8 @@ pub fn show_opencode_menu(title: &str) -> crate::error::Result<OpenCodeMenuChoic
         OpenCodeMenuChoice::Delete,
         OpenCodeMenuChoice::DetectSite,
         OpenCodeMenuChoice::DetectModel,
-        OpenCodeMenuChoice::Back,
+        OpenCodeMenuChoice::Backup,
+        OpenCodeMenuChoice::Exit,
     ];
 
     let selection = Select::with_theme(&ColorfulTheme::default())

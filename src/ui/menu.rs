@@ -1,6 +1,6 @@
-use crate::commands::{BackupCommand, ClaudeCommand, CodexCommand, GeminiCommand, OpenCodeCommand};
+use crate::commands::{BackupCommand, OpenCodeCommand};
 use crate::error::Result;
-use crate::ui::{show_banner, show_main_menu, MainMenuChoice};
+use crate::ui::{show_banner, OpenCodeMenuChoice};
 
 /// 菜单管理器
 pub struct Menu;
@@ -11,36 +11,24 @@ impl Menu {
     }
 
     /// 运行交互式菜单
+    /// 直接进入 OpenCode 配置管理，无需先选择功能模块
     pub async fn run(&mut self) -> Result<()> {
         // 显示 Banner
         show_banner(env!("CARGO_PKG_VERSION"), false);
 
+        // 直接进入 OpenCode 配置管理
         loop {
-            match show_main_menu()? {
-                MainMenuChoice::Api => {
-                    let mut cmd = ClaudeCommand::new()?;
-                    cmd.execute()?;
+            let mut cmd = OpenCodeCommand::new()?;
+            match cmd.execute_with_menu()? {
+                OpenCodeMenuChoice::Backup => {
+                    let mut backup_cmd = BackupCommand::new()?;
+                    backup_cmd.execute().await?;
                 }
-                MainMenuChoice::CodexApi => {
-                    let mut cmd = CodexCommand::new()?;
-                    cmd.execute()?;
-                }
-                MainMenuChoice::GeminiApi => {
-                    let mut cmd = GeminiCommand::new()?;
-                    cmd.execute()?;
-                }
-                MainMenuChoice::OpenCodeApi => {
-                    let mut cmd = OpenCodeCommand::new()?;
-                    cmd.execute()?;
-                }
-                MainMenuChoice::Backup => {
-                    let mut cmd = BackupCommand::new()?;
-                    cmd.execute().await?;
-                }
-                MainMenuChoice::Exit => {
+                OpenCodeMenuChoice::Exit => {
                     println!("\n👋 再见喵～");
                     break;
                 }
+                _ => {}
             }
         }
 

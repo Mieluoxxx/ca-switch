@@ -20,55 +20,70 @@ impl OpenCodeCommand {
         })
     }
 
-    /// 执行命令
+    /// 执行命令 (原有方法，内部循环)
     pub fn execute(&mut self) -> Result<(), String> {
         loop {
-            let choice =
-                show_opencode_menu("🚀 OpenCode配置管理").map_err(|e| e.to_string())?;
-
-            use crate::ui::style::OpenCodeMenuChoice;
-            match choice {
-                OpenCodeMenuChoice::Apply => {
-                    if let Err(e) = self.handle_apply() {
-                        show_error(&format!("应用配置失败: {}", e));
-                        self.wait_for_back();
-                    }
+            match self.execute_with_menu()? {
+                crate::ui::style::OpenCodeMenuChoice::Exit => break,
+                crate::ui::style::OpenCodeMenuChoice::Backup => {
+                    // 备份功能由外部 Menu 处理
+                    // 这里只是为了保持兼容性
                 }
-                OpenCodeMenuChoice::Add => {
-                    if let Err(e) = self.handle_add() {
-                        show_error(&format!("添加配置失败: {}", e));
-                        self.wait_for_back();
-                    }
-                }
-                OpenCodeMenuChoice::Edit => {
-                    if let Err(e) = self.handle_edit() {
-                        show_error(&format!("编辑配置失败: {}", e));
-                        self.wait_for_back();
-                    }
-                }
-                OpenCodeMenuChoice::Delete => {
-                    if let Err(e) = self.handle_delete() {
-                        show_error(&format!("删除配置失败: {}", e));
-                        self.wait_for_back();
-                    }
-                }
-                OpenCodeMenuChoice::DetectSite => {
-                    if let Err(e) = self.handle_detect_site() {
-                        show_error(&format!("站点检测失败: {}", e));
-                        self.wait_for_back();
-                    }
-                }
-                OpenCodeMenuChoice::DetectModel => {
-                    if let Err(e) = self.handle_detect_model() {
-                        show_error(&format!("模型检测失败: {}", e));
-                        self.wait_for_back();
-                    }
-                }
-                OpenCodeMenuChoice::Back => break,
+                _ => {}
             }
         }
-
         Ok(())
+    }
+
+    /// 执行单次菜单交互并返回用户选择
+    /// 供外部 Menu 调用以处理 Backup 和 Exit
+    pub fn execute_with_menu(&mut self) -> Result<crate::ui::style::OpenCodeMenuChoice, String> {
+        let choice =
+            show_opencode_menu("🚀 OpenCode配置管理").map_err(|e| e.to_string())?;
+
+        use crate::ui::style::OpenCodeMenuChoice;
+        match choice {
+            OpenCodeMenuChoice::Apply => {
+                if let Err(e) = self.handle_apply() {
+                    show_error(&format!("应用配置失败: {}", e));
+                    self.wait_for_back();
+                }
+            }
+            OpenCodeMenuChoice::Add => {
+                if let Err(e) = self.handle_add() {
+                    show_error(&format!("添加配置失败: {}", e));
+                    self.wait_for_back();
+                }
+            }
+            OpenCodeMenuChoice::Edit => {
+                if let Err(e) = self.handle_edit() {
+                    show_error(&format!("编辑配置失败: {}", e));
+                    self.wait_for_back();
+                }
+            }
+            OpenCodeMenuChoice::Delete => {
+                if let Err(e) = self.handle_delete() {
+                    show_error(&format!("删除配置失败: {}", e));
+                    self.wait_for_back();
+                }
+            }
+            OpenCodeMenuChoice::DetectSite => {
+                if let Err(e) = self.handle_detect_site() {
+                    show_error(&format!("站点检测失败: {}", e));
+                    self.wait_for_back();
+                }
+            }
+            OpenCodeMenuChoice::DetectModel => {
+                if let Err(e) = self.handle_detect_model() {
+                    show_error(&format!("模型检测失败: {}", e));
+                    self.wait_for_back();
+                }
+            }
+            // Backup 和 Exit 由调用方处理
+            OpenCodeMenuChoice::Backup | OpenCodeMenuChoice::Exit => {}
+        }
+
+        Ok(choice)
     }
 
     // ========================================================================

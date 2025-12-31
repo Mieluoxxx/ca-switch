@@ -92,84 +92,6 @@ impl FileManager {
             },
         );
 
-        // Claude Code 配置
-        let mut claude_files = HashMap::new();
-        claude_files.insert(
-            "settings.json".to_string(),
-            self.home_dir.join(".claude").join("settings.json"),
-        );
-        claude_files.insert(
-            "CLAUDE.md".to_string(),
-            self.home_dir.join(".claude").join("CLAUDE.md"),
-        );
-
-        let mut claude_dirs = HashMap::new();
-        claude_dirs.insert(
-            "agents".to_string(),
-            self.home_dir.join(".claude").join("agents"),
-        );
-        claude_dirs.insert(
-            "commands".to_string(),
-            self.home_dir.join(".claude").join("commands"),
-        );
-        claude_dirs.insert(
-            "skills".to_string(),
-            self.home_dir.join(".claude").join("skills"),
-        );
-
-        paths.insert(
-            "claudeCode".to_string(),
-            CategoryPaths {
-                name: "Claude Code配置".to_string(),
-                files: claude_files,
-                directories: claude_dirs,
-            },
-        );
-
-        // Codex 配置
-        let mut codex_files = HashMap::new();
-        codex_files.insert(
-            "config.toml".to_string(),
-            self.find_codex_file("config.toml"),
-        );
-        codex_files.insert(
-            "auth.json".to_string(),
-            self.find_codex_file("auth.json"),
-        );
-        codex_files.insert(
-            "AGENTS.md".to_string(),
-            self.find_codex_file("AGENTS.md"),
-        );
-
-        paths.insert(
-            "codex".to_string(),
-            CategoryPaths {
-                name: "Codex配置".to_string(),
-                files: codex_files,
-                directories: HashMap::new(),
-            },
-        );
-
-        // Gemini 配置
-        let mut gemini_files = HashMap::new();
-        gemini_files.insert(
-            ".env".to_string(),
-            self.home_dir.join(".gemini").join(".env"),
-        );
-        gemini_files.insert(
-            "settings.json".to_string(),
-            self.home_dir.join(".gemini").join("settings.json"),
-        );
-
-        paths.insert(
-            "gemini".to_string(),
-            CategoryPaths {
-                name: "Gemini配置".to_string(),
-                files: gemini_files,
-                directories: HashMap::new(),
-            },
-        );
-
         // OpenCode 配置
         let mut opencode_files = HashMap::new();
         opencode_files.insert(
@@ -187,24 +109,6 @@ impl FileManager {
         );
 
         paths
-    }
-
-    /// 查找 Codex 配置文件
-    fn find_codex_file(&self, filename: &str) -> PathBuf {
-        let possible_paths = vec![
-            self.home_dir.join(".codex").join(filename),
-            self.home_dir.join(".config").join("codex").join(filename),
-            self.home_dir.join("Documents").join("codex").join(filename),
-        ];
-
-        for path in possible_paths {
-            if path.exists() {
-                return path;
-            }
-        }
-
-        // 默认返回 ~/.codex/
-        self.home_dir.join(".codex").join(filename)
     }
 
     /// 检查配置类别的文件存在性

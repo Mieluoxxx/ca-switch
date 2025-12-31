@@ -7,7 +7,7 @@ authors = ["moguw <weiyiding0@gmail.com>"]
 license = "MIT"
 repository = "https://github.com/Mieluoxxx/ca-switch.git"
 homepage = "https://github.com/Mieluoxxx/ca-switch#readme"
-keywords = ["claude-code", "codex", "gemini-cli", "opencode"]
+keywords = ["opencode", "coding-agent", "config-manager"]
 categories = ["command-line-utilities"]
 
 [[bin]]

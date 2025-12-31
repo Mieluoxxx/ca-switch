@@ -168,10 +168,7 @@ impl BackupCommand {
     /// 备份单个类别
     async fn backup_category(&mut self, category: &str) -> Result<()> {
         let category_name = match category {
-            "ccCli" => "CC-CLI配置",
-            "claudeCode" => "Claude Code配置",
-            "codex" => "Codex配置",
-            "gemini" => "Gemini配置",
+            "ccCli" => "CA-Switch配置",
             "opencode" => "OpenCode配置",
             _ => category,
         };
@@ -213,21 +210,6 @@ impl BackupCommand {
                 true,
             ),
             BackupCategory::new(
-                "🎯 Claude Code配置 (settings.json, CLAUDE.md, agents/, commands/, skills/)",
-                "claudeCode",
-                false,
-            ),
-            BackupCategory::new(
-                "⚙️  Codex配置 (config.toml, auth.json, AGENTS.md)",
-                "codex",
-                false,
-            ),
-            BackupCategory::new(
-                "🌟 Gemini配置 (.env, settings.json)",
-                "gemini",
-                false,
-            ),
-            BackupCategory::new(
                 "🚀 OpenCode配置 (opencode.json)",
                 "opencode",
                 false,
@@ -259,10 +241,7 @@ impl BackupCommand {
 
         for category in categories {
             let display = match category.as_str() {
-                "ccCli" => "🔧 CC-CLI配置",
-                "claudeCode" => "🎯 Claude Code配置",
-                "codex" => "⚙️  Codex配置",
-                "gemini" => "🌟 Gemini配置",
+                "ccCli" => "🔧 CA-Switch配置",
                 "opencode" => "🚀 OpenCode配置",
                 _ => category,
             };
@@ -317,7 +296,7 @@ impl BackupCommand {
         println!("{}", style("🔍 本地配置文件状态：").white().bold());
         println!();
 
-        let categories = vec!["ccCli", "claudeCode", "codex", "gemini", "opencode"];
+        let categories = vec!["ccCli", "opencode"];
 
         for category in categories {
             match self.file_manager.check_category_files(category).await {
