@@ -1,17 +1,17 @@
 [package]
-name = "ca-switch"
-version = "0.4.0"
+name = "opcd"
+version = "0.5.0"
 edition = "2021"
 description = "Coding Agent配置管理CLI工具"
 authors = ["moguw <weiyiding0@gmail.com>"]
 license = "MIT"
-repository = "https://github.com/Mieluoxxx/ca-switch.git"
-homepage = "https://github.com/Mieluoxxx/ca-switch#readme"
+repository = "https://github.com/Mieluoxxx/opcd.git"
+homepage = "https://github.com/Mieluoxxx/opcd#readme"
 keywords = ["opencode", "coding-agent", "config-manager"]
 categories = ["command-line-utilities"]
 
 [[bin]]
-name = "ca-switch"
+name = "opcd"
 path = "src/main.rs"
 
 [dependencies]

@@ -72,7 +72,7 @@ pub fn render(frame: &mut Frame, app: &mut App, theme: &Theme) {
 /// 渲染顶部标题栏
 fn render_header(frame: &mut Frame, theme: &Theme, area: Rect) {
     let version = env!("CARGO_PKG_VERSION");
-    let title = format!(" 🚀 ca-switch v{} ", version);
+    let title = format!(" 🚀 opcd v{} ", version);
 
     let block = Block::default()
         .borders(Borders::ALL)
@@ -94,7 +94,6 @@ fn render_tabs(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
         .map(|tab| {
             let icon = match tab {
                 AppTab::Providers => "🔌",
-                AppTab::Models => "🤖",
                 AppTab::Backup => "💾",
                 AppTab::Status => "📊",
             };
@@ -124,26 +123,180 @@ fn render_tabs(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
 fn render_content(frame: &mut Frame, app: &mut App, theme: &Theme, area: Rect) {
     match app.current_tab {
         AppTab::Providers => render_providers_tab(frame, app, theme, area),
-        AppTab::Models => render_models_tab(frame, app, theme, area),
         AppTab::Backup => render_backup_tab(frame, app, theme, area),
         AppTab::Status => render_status_tab(frame, app, theme, area),
     }
 }
 
-/// 渲染 Provider Tab
+/// 渲染 Provider Tab（三栏布局：Provider列表 + Model列表 + 详情面板）
 fn render_providers_tab(frame: &mut Frame, app: &mut App, theme: &Theme, area: Rect) {
+    // 多选模式使用两栏布局
+    if app.is_multi_apply_mode {
+        render_providers_multi_select_mode(frame, app, theme, area);
+        return;
+    }
+
+    // 三栏布局：Provider列表(25%) + Model列表(30%) + 详情面板(45%)
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(25),
+            Constraint::Percentage(30),
+            Constraint::Percentage(45),
+        ])
+        .split(area);
+
+    // 左侧: Provider 列表
+    let provider_border = if app.provider_tab_focus == 0 {
+        theme.active_border_style()
+    } else {
+        theme.border_style()
+    };
+
+    let provider_items: Vec<ListItem> = app
+        .providers
+        .iter()
+        .map(|name| {
+            ListItem::new(Line::from(vec![
+                Span::raw(" 🔌 "),
+                Span::styled(name.clone(), Style::default().fg(theme.fg)),
+            ]))
+        })
+        .collect();
+
+    let provider_list = List::new(provider_items)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(provider_border)
+                .title(format!(" Providers ({}) ", app.get_provider_count())),
+        )
+        .highlight_style(theme.highlight_style())
+        .highlight_symbol("▶ ");
+
+    frame.render_stateful_widget(provider_list, chunks[0], &mut app.provider_list_state);
+
+    // 中间: Model 列表
+    let model_border = if app.provider_tab_focus == 1 {
+        theme.active_border_style()
+    } else {
+        theme.border_style()
+    };
+
+    let model_title = if app.get_selected_provider().is_some() {
+        format!(" Models ({}) ", app.models.len())
+    } else {
+        " Models ".to_string()
+    };
+
+    // 检查是否需要显示搜索框
+    let show_search = app.search_active || !app.search_query.is_empty();
+
+    let model_area = if show_search {
+        let model_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(3), Constraint::Min(3)])
+            .split(chunks[1]);
+
+        // 渲染搜索框
+        let search_border = if app.search_active {
+            theme.active_border_style()
+        } else {
+            theme.border_style()
+        };
+
+        let search_block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(search_border)
+            .title(Span::styled(" / 搜索 ", theme.title_style()));
+
+        let search_inner = search_block.inner(model_chunks[0]);
+        frame.render_widget(search_block, model_chunks[0]);
+
+        let search_text = if app.search_query.is_empty() {
+            "输入关键词过滤模型..."
+        } else {
+            &app.search_query
+        };
+
+        let cursor = if app.search_active { "▌" } else { "" };
+        let search_style = if app.search_query.is_empty() {
+            theme.muted_style()
+        } else {
+            Style::default().fg(theme.fg)
+        };
+
+        let search_para = Paragraph::new(format!("{}{}", search_text, cursor)).style(search_style);
+        frame.render_widget(search_para, search_inner);
+
+        model_chunks[1]
+    } else {
+        chunks[1]
+    };
+
+    let model_block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(model_border)
+        .title(model_title);
+
+    let model_inner = model_block.inner(model_area);
+    frame.render_widget(model_block, model_area);
+
+    if app.get_selected_provider().is_some() {
+        let filtered_models = app.get_filtered_models();
+
+        if !filtered_models.is_empty() {
+            let model_items: Vec<ListItem> = filtered_models
+                .iter()
+                .map(|name| {
+                    ListItem::new(Line::from(vec![
+                        Span::raw(" 🤖 "),
+                        Span::styled((*name).clone(), Style::default().fg(theme.info)),
+                    ]))
+                })
+                .collect();
+
+            let model_list = List::new(model_items)
+                .highlight_style(theme.highlight_style())
+                .highlight_symbol("▶ ");
+
+            frame.render_stateful_widget(model_list, model_inner, &mut app.model_list_state);
+        } else if !app.search_query.is_empty() {
+            let text = Paragraph::new(format!("没有匹配 \"{}\" 的模型", app.search_query))
+                .style(theme.muted_style())
+                .wrap(Wrap { trim: true });
+            frame.render_widget(text, model_inner);
+        } else {
+            let text = Paragraph::new("暂无 Model\n\n按 [a] 添加")
+                .style(theme.muted_style())
+                .wrap(Wrap { trim: true });
+            frame.render_widget(text, model_inner);
+        }
+    } else {
+        let text = Paragraph::new("← 选择 Provider")
+            .style(theme.muted_style())
+            .wrap(Wrap { trim: true });
+        frame.render_widget(text, model_inner);
+    }
+
+    // 右侧: 详情面板
+    render_detail_panel(frame, app, theme, chunks[2]);
+}
+
+/// 渲染多选应用模式（两栏布局）
+fn render_providers_multi_select_mode(frame: &mut Frame, app: &mut App, theme: &Theme, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
         .split(area);
 
-    // 左侧: Provider 列表
+    // 左侧: Provider 列表（带选择状态）
     let items: Vec<ListItem> = app
         .providers
         .iter()
         .map(|name| {
             let is_selected = app.is_provider_selected(name);
-            let prefix = if is_selected { "☑" } else { "🔌" };
+            let prefix = if is_selected { "☑" } else { "☐" };
             let name_style = if is_selected {
                 Style::default().fg(theme.success)
             } else {
@@ -162,7 +315,7 @@ fn render_providers_tab(frame: &mut Frame, app: &mut App, theme: &Theme, area: R
                 .borders(Borders::ALL)
                 .border_style(theme.active_border_style())
                 .title(format!(
-                    " Providers ({}/{}) ",
+                    " 多选 ({}/{}) ",
                     app.get_selected_count(),
                     app.get_provider_count()
                 )),
@@ -170,267 +323,143 @@ fn render_providers_tab(frame: &mut Frame, app: &mut App, theme: &Theme, area: R
         .highlight_style(theme.highlight_style())
         .highlight_symbol("▶ ");
 
-    // 根据是否在多选模式选择不同的列表状态
-    if app.is_multi_apply_mode {
-        frame.render_stateful_widget(list, chunks[0], &mut app.multi_apply_list_state);
-    } else {
-        frame.render_stateful_widget(list, chunks[0], &mut app.provider_list_state);
-    }
+    frame.render_stateful_widget(list, chunks[0], &mut app.multi_apply_list_state);
 
-    // 右侧: Provider 详情
+    // 右侧: 操作说明
     let detail_block = Block::default()
         .borders(Borders::ALL)
-        .border_style(theme.border_style());
-
-    // 根据是否在多选模式显示不同的标题
-    let title = if app.is_multi_apply_mode {
-        format!(
-            " 多选应用模式 (按 [Space] 切换选择, [Enter] 确认, [Esc] 取消) "
-        )
-    } else {
-        " Provider 详情 ".to_string()
-    };
-
-    let detail_block = detail_block.title(Span::styled(title, theme.title_style()));
+        .border_style(theme.border_style())
+        .title(Span::styled(" 多选应用模式 ", theme.title_style()));
 
     let inner = detail_block.inner(chunks[1]);
     frame.render_widget(detail_block, chunks[1]);
 
-    if app.is_multi_apply_mode {
-        // 多选模式下的详情显示
-        if let Some(provider_name) = app.get_multi_apply_current() {
-            if let Ok(Some(provider)) = app.config_manager.opencode().get_provider(provider_name) {
-                let is_selected = app.is_provider_selected(provider_name);
-                let status = if is_selected { "✓ 已选择" } else { "○ 未选择" };
+    if let Some(provider_name) = app.get_multi_apply_current() {
+        if let Ok(Some(provider)) = app.config_manager.opencode().get_provider(provider_name) {
+            let is_selected = app.is_provider_selected(provider_name);
+            let status = if is_selected { "✓ 已选择" } else { "○ 未选择" };
 
-                let details = vec![
-                    Line::from(vec![
-                        Span::styled("当前项: ", Style::default().add_modifier(Modifier::BOLD)),
-                        Span::styled(provider_name, Style::default().fg(theme.primary)),
-                        Span::styled(format!("  [{}]", status), theme.success_style()),
-                    ]),
-                    Line::from(vec![
-                        Span::styled("URL: ", Style::default().add_modifier(Modifier::BOLD)),
-                        Span::styled(&provider.options.base_url, theme.muted_style()),
-                    ]),
-                    Line::from(vec![
-                        Span::styled("模型数: ", Style::default().add_modifier(Modifier::BOLD)),
-                        Span::styled(
-                            provider.models.len().to_string(),
-                            Style::default().fg(theme.success),
-                        ),
-                    ]),
-                    Line::from(""),
-                    Line::from(Span::styled(
-                        "快捷键:",
-                        Style::default().add_modifier(Modifier::BOLD),
-                    )),
-                    Line::from("  [Space] 切换选择    [↑/k] 上移    [↓/j] 下移"),
-                    Line::from("  [Enter] 确认应用    [Esc] 取消    [A] 全选    [C] 清空"),
-                ];
+            let details = vec![
+                Line::from(vec![
+                    Span::styled("当前项: ", Style::default().add_modifier(Modifier::BOLD)),
+                    Span::styled(provider_name, Style::default().fg(theme.primary)),
+                    Span::styled(format!("  [{}]", status), theme.success_style()),
+                ]),
+                Line::from(vec![
+                    Span::styled("URL: ", Style::default().add_modifier(Modifier::BOLD)),
+                    Span::styled(&provider.options.base_url, theme.muted_style()),
+                ]),
+                Line::from(vec![
+                    Span::styled("模型数: ", Style::default().add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        provider.models.len().to_string(),
+                        Style::default().fg(theme.success),
+                    ),
+                ]),
+                Line::from(""),
+                Line::from(Span::styled(
+                    "快捷键:",
+                    Style::default().add_modifier(Modifier::BOLD),
+                )),
+                Line::from("  [Space] 切换选择    [↑/k] 上移    [↓/j] 下移"),
+                Line::from("  [Enter] 确认应用    [Esc] 取消    [A] 全选    [C] 清空"),
+            ];
 
-                let paragraph = Paragraph::new(details).wrap(Wrap { trim: true });
-                frame.render_widget(paragraph, inner);
-            }
-        } else {
-            let empty = Paragraph::new("没有 Provider")
-                .style(theme.muted_style())
-                .wrap(Wrap { trim: true });
-            frame.render_widget(empty, inner);
+            let paragraph = Paragraph::new(details).wrap(Wrap { trim: true });
+            frame.render_widget(paragraph, inner);
         }
     } else {
-        // 普通模式下的详情显示
-        if let Some(provider_name) = app.get_selected_provider() {
-            if let Ok(Some(provider)) = app.config_manager.opencode().get_provider(provider_name) {
-                let details = vec![
-                    Line::from(vec![
-                        Span::styled("名称: ", Style::default().add_modifier(Modifier::BOLD)),
-                        Span::raw(provider_name),
-                    ]),
-                    Line::from(vec![
-                        Span::styled("URL: ", Style::default().add_modifier(Modifier::BOLD)),
-                        Span::styled(&provider.options.base_url, theme.muted_style()),
-                    ]),
-                    Line::from(vec![
-                        Span::styled("模型数: ", Style::default().add_modifier(Modifier::BOLD)),
-                        Span::styled(
-                            provider.models.len().to_string(),
-                            Style::default().fg(theme.success),
-                        ),
-                    ]),
-                    Line::from(""),
-                    Line::from(Span::styled(
-                        "可用模型:",
-                        Style::default().add_modifier(Modifier::BOLD),
-                    )),
-                ];
-
-                let mut all_lines = details;
-                // 排序模型名称以保持稳定的显示顺序
-                let mut model_names: Vec<&String> = provider.models.keys().collect();
-                model_names.sort();
-                for model_name in model_names {
-                    all_lines.push(Line::from(vec![
-                        Span::raw("  • "),
-                        Span::styled(model_name, Style::default().fg(theme.info)),
-                    ]));
-                }
-
-                let paragraph = Paragraph::new(all_lines).wrap(Wrap { trim: true });
-                frame.render_widget(paragraph, inner);
-            }
-        } else {
-            let empty = Paragraph::new("选择一个 Provider 查看详情")
-                .style(theme.muted_style())
-                .wrap(Wrap { trim: true });
-            frame.render_widget(empty, inner);
-        }
+        let empty = Paragraph::new("没有 Provider")
+            .style(theme.muted_style())
+            .wrap(Wrap { trim: true });
+        frame.render_widget(empty, inner);
     }
 }
 
-/// 渲染 Model Tab
-fn render_models_tab(frame: &mut Frame, app: &mut App, theme: &Theme, area: Rect) {
-    let chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(35), Constraint::Percentage(65)])
-        .split(area);
-
-    // 左侧: Provider 选择列表
-    let provider_items: Vec<ListItem> = app
-        .providers
-        .iter()
-        .map(|name| {
-            let is_selected = app.model_tab_provider.as_ref() == Some(name);
-            let prefix = if is_selected { "✓ " } else { "  " };
-            ListItem::new(Line::from(vec![
-                Span::raw(prefix),
-                Span::styled(name.clone(), Style::default().fg(theme.fg)),
-            ]))
-        })
-        .collect();
-
-    let provider_border = if app.model_tab_focus == 0 {
-        theme.active_border_style()
-    } else {
-        theme.border_style()
-    };
-
-    let provider_list = List::new(provider_items)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(provider_border)
-                .title(format!(" Provider ({}) ", app.providers.len())),
-        )
-        .highlight_style(theme.highlight_style())
-        .highlight_symbol("▶ ");
-
-    frame.render_stateful_widget(provider_list, chunks[0], &mut app.model_provider_list_state);
-
-    // 右侧: Model 列表
-    let model_border = if app.model_tab_focus == 1 {
-        theme.active_border_style()
-    } else {
-        theme.border_style()
-    };
-
-    let model_title = if let Some(provider) = &app.model_tab_provider {
-        format!(" {} 的 Models ({}) ", provider, app.models.len())
-    } else {
-        " Models (请先选择 Provider) ".to_string()
-    };
-
-    // 显示搜索框时，需要分割右侧区域
-    let show_search = app.search_active || !app.search_query.is_empty();
-
-    let model_area = if show_search {
-        // 右侧分割：搜索框 + 模型列表
-        let right_chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(3), Constraint::Min(5)])
-            .split(chunks[1]);
-
-        // 渲染搜索框
-        let search_border = if app.search_active {
-            theme.active_border_style()
-        } else {
-            theme.border_style()
-        };
-
-        let search_block = Block::default()
-            .borders(Borders::ALL)
-            .border_style(search_border)
-            .title(Span::styled(" / 搜索 ", theme.title_style()));
-
-        let search_inner = search_block.inner(right_chunks[0]);
-        frame.render_widget(search_block, right_chunks[0]);
-
-        let search_text = if app.search_query.is_empty() {
-            "输入关键词过滤模型..."
-        } else {
-            &app.search_query
-        };
-
-        let cursor = if app.search_active { "▌" } else { "" };
-        let search_style = if app.search_query.is_empty() {
-            theme.muted_style()
-        } else {
-            Style::default().fg(theme.fg)
-        };
-
-        let search_para = Paragraph::new(format!("{}{}", search_text, cursor)).style(search_style);
-        frame.render_widget(search_para, search_inner);
-
-        right_chunks[1]
-    } else {
-        // 不显示搜索框时，整个区域给模型列表
-        chunks[1]
-    };
-
-    let model_block = Block::default()
+/// 渲染详情面板（Provider + Model 详情）
+fn render_detail_panel(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
+    let detail_block = Block::default()
         .borders(Borders::ALL)
-        .border_style(model_border)
-        .title(model_title);
+        .border_style(theme.border_style())
+        .title(Span::styled(" 详情 ", theme.title_style()));
 
-    let inner = model_block.inner(model_area);
-    frame.render_widget(model_block, model_area);
+    let inner = detail_block.inner(area);
+    frame.render_widget(detail_block, area);
 
-    if app.model_tab_provider.is_some() {
-        // 获取过滤后的模型列表
-        let filtered_models = app.get_filtered_models();
+    if let Some(provider_name) = app.get_selected_provider() {
+        if let Ok(Some(provider)) = app.config_manager.opencode().get_provider(provider_name) {
+            let mut lines = vec![
+                Line::from(Span::styled(
+                    "Provider 信息",
+                    Style::default().add_modifier(Modifier::BOLD),
+                )),
+                Line::from(vec![
+                    Span::styled("  名称: ", theme.muted_style()),
+                    Span::styled(provider_name, Style::default().fg(theme.primary)),
+                ]),
+                Line::from(vec![
+                    Span::styled("  URL:  ", theme.muted_style()),
+                    Span::styled(&provider.options.base_url, Style::default().fg(theme.info)),
+                ]),
+                Line::from(vec![
+                    Span::styled("  模型: ", theme.muted_style()),
+                    Span::styled(
+                        format!("{} 个", provider.models.len()),
+                        Style::default().fg(theme.success),
+                    ),
+                ]),
+            ];
 
-        if !filtered_models.is_empty() {
-            let model_items: Vec<ListItem> = filtered_models
-                .iter()
-                .map(|name| {
-                    ListItem::new(Line::from(vec![
-                        Span::raw(" 🤖 "),
-                        Span::styled((*name).clone(), Style::default().fg(theme.info)),
-                    ]))
-                })
-                .collect();
+            // 显示选中的 Model 详情
+            if let Some(model_name) = app.get_selected_model() {
+                lines.push(Line::from(""));
+                lines.push(Line::from(Span::styled(
+                    "选中模型",
+                    Style::default().add_modifier(Modifier::BOLD),
+                )));
+                lines.push(Line::from(vec![
+                    Span::styled("  名称: ", theme.muted_style()),
+                    Span::styled(model_name, Style::default().fg(theme.info)),
+                ]));
 
-            let model_list = List::new(model_items)
-                .highlight_style(theme.highlight_style())
-                .highlight_symbol("▶ ");
+                // 显示模型限制信息（如果有）
+                if let Some(model_info) = provider.models.get(model_name) {
+                    if let Some(ref limit) = model_info.limit {
+                        if let Some(ctx) = limit.context {
+                            lines.push(Line::from(vec![
+                                Span::styled("  Context: ", theme.muted_style()),
+                                Span::styled(format_token_count(ctx), Style::default().fg(theme.fg)),
+                            ]));
+                        }
+                        if let Some(out) = limit.output {
+                            lines.push(Line::from(vec![
+                                Span::styled("  Output:  ", theme.muted_style()),
+                                Span::styled(format_token_count(out), Style::default().fg(theme.fg)),
+                            ]));
+                        }
+                    }
+                }
+            }
 
-            frame.render_stateful_widget(model_list, inner, &mut app.model_list_state);
-        } else if !app.search_query.is_empty() {
-            let text = Paragraph::new(format!("没有匹配 \"{}\" 的模型\n\n按 [Esc] 清除搜索", app.search_query))
-                .style(theme.muted_style())
-                .wrap(Wrap { trim: true });
-            frame.render_widget(text, inner);
-        } else {
-            let text = Paragraph::new("暂无 Model\n\n按 [a] 添加 [t] 获取站点模型")
-                .style(theme.muted_style())
-                .wrap(Wrap { trim: true });
-            frame.render_widget(text, inner);
+            let paragraph = Paragraph::new(lines).wrap(Wrap { trim: true });
+            frame.render_widget(paragraph, inner);
         }
     } else {
-        let text = Paragraph::new("选择左侧的 Provider 来查看其 Model 列表\n\n按 [Enter] 选择 Provider")
+        let text = Paragraph::new("选择一个 Provider 查看详情")
             .style(theme.muted_style())
             .wrap(Wrap { trim: true });
         frame.render_widget(text, inner);
+    }
+}
+
+/// 格式化 token 数量（如 128000 -> 128k）
+fn format_token_count(count: u64) -> String {
+    if count >= 1_000_000 {
+        format!("{}M", count / 1_000_000)
+    } else if count >= 1000 {
+        format!("{}k", count / 1000)
+    } else {
+        count.to_string()
     }
 }
 
@@ -472,12 +501,12 @@ fn render_backup_tab(frame: &mut Frame, _app: &mut App, theme: &Theme, area: Rec
         Line::from(""),
         Line::from(vec![
             Span::raw("    "),
-            Span::styled("ca-switch backup", Style::default().fg(theme.info)),
+            Span::styled("opcd backup", Style::default().fg(theme.info)),
             Span::raw("        # 创建备份"),
         ]),
         Line::from(vec![
             Span::raw("    "),
-            Span::styled("ca-switch restore", Style::default().fg(theme.info)),
+            Span::styled("opcd restore", Style::default().fg(theme.info)),
             Span::raw("       # 恢复备份"),
         ]),
     ];
@@ -500,7 +529,7 @@ fn render_backup_tab(frame: &mut Frame, _app: &mut App, theme: &Theme, area: Rec
         Line::from(""),
         Line::from(vec![
             Span::raw("配置 WebDAV: "),
-            Span::styled("ca-switch webdav config", Style::default().fg(theme.primary)),
+            Span::styled("opcd webdav config", Style::default().fg(theme.primary)),
         ]),
     ];
 
@@ -632,11 +661,14 @@ fn render_footer(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
         AppTab::Providers => {
             if app.is_multi_apply_mode {
                 "[j/↓]下移 [k/↑]上移 [Space]选择 [Enter]确认 [A]全选 [C]清空 [Esc]取消"
+            } else if app.provider_tab_focus == 0 {
+                // Provider 列表焦点
+                "[h/l]切换面板 [j/k]导航 [Enter]应用 [a]添加 [e]编辑 [d]删除"
             } else {
-                "[j/↓]下移 [k/↑]上移 [Enter]应用 [a]添加 [e]编辑 [d]删除"
+                // Model 列表焦点
+                "[h/l]切换面板 [j/k]导航 [a]添加 [d]删除 [/]搜索 [t]获取模型"
             }
         }
-        AppTab::Models => "[h/l]切换面板 [j/k]导航 [Enter]选择 [a]添加 [d]删除 [/]搜索 [t]获取模型",
         AppTab::Backup => "[b]备份 [r]恢复 [d]删除",
         AppTab::Status => "[r]刷新",
     };
@@ -746,15 +778,18 @@ fn render_help_popup(frame: &mut Frame, theme: &Theme, area: Rect) {
         Line::from("  ?             显示/隐藏帮助"),
         Line::from(""),
         Line::from(Span::styled(
-            "Provider Tab:",
+            "Provider Tab (三栏布局):",
             Style::default().add_modifier(Modifier::BOLD),
         )),
+        Line::from("  h / l         切换面板 (Provider ↔ Model)"),
         Line::from("  j / ↓         选择下一个"),
         Line::from("  k / ↑         选择上一个"),
         Line::from("  Enter         应用配置（进入多选模式）"),
-        Line::from("  a             添加新 Provider"),
+        Line::from("  a             添加 Provider / Model"),
         Line::from("  e             编辑选中的 Provider"),
-        Line::from("  d             删除选中的 Provider"),
+        Line::from("  d             删除选中的 Provider / Model"),
+        Line::from("  /             搜索模型"),
+        Line::from("  t             获取站点模型"),
         Line::from(""),
         Line::from(Span::styled(
             "多选应用模式:",

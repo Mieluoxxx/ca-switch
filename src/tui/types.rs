@@ -4,28 +4,21 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum AppTab {
     #[default]
-    Providers, // Provider 管理
-    Models,   // Model 管理
-    Backup,   // 备份恢复
-    Status,   // 状态监控
+    Providers, // Provider + Model 管理（合并后）
+    Backup,    // 备份恢复
+    Status,    // 状态监控
 }
 
 impl AppTab {
     /// 获取所有 Tab
     pub fn all() -> &'static [AppTab] {
-        &[
-            AppTab::Providers,
-            AppTab::Models,
-            AppTab::Backup,
-            AppTab::Status,
-        ]
+        &[AppTab::Providers, AppTab::Backup, AppTab::Status]
     }
 
     /// 获取 Tab 标题
     pub fn title(&self) -> &'static str {
         match self {
             AppTab::Providers => "Providers",
-            AppTab::Models => "Models",
             AppTab::Backup => "Backup",
             AppTab::Status => "Status",
         }
@@ -34,8 +27,7 @@ impl AppTab {
     /// 切换到下一个 Tab
     pub fn next(&self) -> Self {
         match self {
-            AppTab::Providers => AppTab::Models,
-            AppTab::Models => AppTab::Backup,
+            AppTab::Providers => AppTab::Backup,
             AppTab::Backup => AppTab::Status,
             AppTab::Status => AppTab::Providers,
         }
@@ -45,8 +37,7 @@ impl AppTab {
     pub fn prev(&self) -> Self {
         match self {
             AppTab::Providers => AppTab::Status,
-            AppTab::Models => AppTab::Providers,
-            AppTab::Backup => AppTab::Models,
+            AppTab::Backup => AppTab::Providers,
             AppTab::Status => AppTab::Backup,
         }
     }
@@ -55,9 +46,8 @@ impl AppTab {
     pub fn index(&self) -> usize {
         match self {
             AppTab::Providers => 0,
-            AppTab::Models => 1,
-            AppTab::Backup => 2,
-            AppTab::Status => 3,
+            AppTab::Backup => 1,
+            AppTab::Status => 2,
         }
     }
 }
