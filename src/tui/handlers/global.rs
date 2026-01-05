@@ -233,13 +233,12 @@ fn handle_editing_mode(app: &mut App, key: KeyEvent) -> bool {
 fn handle_tab_specific_key(app: &mut App, key: KeyEvent) -> bool {
     match app.current_tab {
         AppTab::Providers => handle_provider_tab_key(app, key),
-        AppTab::Models => handle_model_tab_key(app, key),
         AppTab::Backup => handle_backup_tab_key(app, key),
         AppTab::Status => handle_status_tab_key(app, key),
     }
 }
 
-/// Provider Tab 按键处理
+/// Provider Tab 按键处理（三栏布局：Provider列表 + Model列表 + 详情）
 fn handle_provider_tab_key(app: &mut App, key: KeyEvent) -> bool {
     // 如果处于多选应用模式，优先处理多选相关的按键
     if app.is_multi_apply_mode {
@@ -247,33 +246,87 @@ fn handle_provider_tab_key(app: &mut App, key: KeyEvent) -> bool {
     }
 
     match key.code {
-        // 导航
+        // 焦点切换：h/l 或 左右方向键
+        KeyCode::Char('h') | KeyCode::Left => {
+            if app.provider_tab_focus > 0 {
+                app.set_provider_tab_focus(0);
+            }
+            true
+        }
+        KeyCode::Char('l') | KeyCode::Right => {
+            if app.provider_tab_focus == 0 && app.get_selected_provider().is_some() {
+                app.set_provider_tab_focus(1);
+                // 确保刷新 Model 列表
+                app.refresh_models();
+            }
+            true
+        }
+        // 导航：根据当前焦点选择不同的列表
         KeyCode::Down | KeyCode::Char('j') => {
-            app.select_next_provider();
+            if app.provider_tab_focus == 0 {
+                app.select_next_provider();
+                app.refresh_models(); // 立即刷新 Model 列表
+            } else {
+                app.select_next_model();
+            }
             true
         }
         KeyCode::Up | KeyCode::Char('k') => {
-            app.select_prev_provider();
+            if app.provider_tab_focus == 0 {
+                app.select_prev_provider();
+                app.refresh_models(); // 立即刷新 Model 列表
+            } else {
+                app.select_prev_model();
+            }
             true
         }
-        // 添加 Provider
+        // 添加：根据焦点决定添加 Provider 还是 Model
         KeyCode::Char('a') => {
-            app.open_add_provider_form();
+            if app.provider_tab_focus == 0 {
+                app.open_add_provider_form();
+            } else {
+                app.open_add_model_form();
+            }
             true
         }
-        // 编辑 Provider
+        // 编辑 Provider（仅在 Provider 焦点时）
         KeyCode::Char('e') => {
-            app.open_edit_provider_form();
+            if app.provider_tab_focus == 0 {
+                app.open_edit_provider_form();
+            }
             true
         }
-        // 删除 Provider
+        // 删除：根据焦点决定删除 Provider 还是 Model
         KeyCode::Char('d') => {
-            app.open_delete_dialog();
+            if app.provider_tab_focus == 0 {
+                app.open_delete_dialog();
+            } else {
+                app.open_model_delete_dialog();
+            }
             true
         }
-        // 应用配置 - 进入多选模式
+        // 应用配置 - 进入多选模式（仅在 Provider 焦点时）
         KeyCode::Enter => {
-            app.enter_multi_apply_mode();
+            if app.provider_tab_focus == 0 {
+                app.enter_multi_apply_mode();
+            }
+            true
+        }
+        // 获取站点模型（仅在 Model 焦点时）
+        KeyCode::Char('t') => {
+            if app.provider_tab_focus == 1 || app.get_selected_provider().is_some() {
+                if let Some((base_url, api_key)) = app.prepare_fetch_site_models() {
+                    fetch_site_models_sync(app, &base_url, &api_key);
+                }
+            }
+            true
+        }
+        // 搜索模型
+        KeyCode::Char('/') => {
+            if app.get_selected_provider().is_some() {
+                app.set_provider_tab_focus(1); // 切换到 Model 列表
+                app.enter_search_mode();
+            }
             true
         }
         _ => false,
@@ -387,71 +440,6 @@ fn handle_model_delete_dialog(app: &mut App, key: KeyEvent) -> bool {
             true
         }
         _ => true,
-    }
-}
-
-/// Model Tab 按键处理
-fn handle_model_tab_key(app: &mut App, key: KeyEvent) -> bool {
-    match key.code {
-        // 切换焦点区域 (Tab 键在 Provider 和 Model 列表之间切换)
-        KeyCode::Left | KeyCode::Right | KeyCode::Char('h') | KeyCode::Char('l') => {
-            app.toggle_model_tab_focus();
-            true
-        }
-        // 导航
-        KeyCode::Down | KeyCode::Char('j') => {
-            if app.model_tab_focus == 0 {
-                app.select_next_model_provider();
-            } else {
-                app.select_next_model();
-            }
-            true
-        }
-        KeyCode::Up | KeyCode::Char('k') => {
-            if app.model_tab_focus == 0 {
-                app.select_prev_model_provider();
-            } else {
-                app.select_prev_model();
-            }
-            true
-        }
-        // 选择 Provider (加载其 Model 列表)
-        KeyCode::Enter => {
-            if app.model_tab_focus == 0 {
-                app.select_model_tab_provider();
-            }
-            true
-        }
-        // 添加 Model
-        KeyCode::Char('a') => {
-            app.open_add_model_form();
-            true
-        }
-        // 删除 Model
-        KeyCode::Char('d') => {
-            if app.model_tab_focus == 1 {
-                app.open_model_delete_dialog();
-            }
-            true
-        }
-        // 获取站点模型 (t = test/fetch)
-        KeyCode::Char('t') => {
-            // 返回需要异步获取的信息，由主循环处理
-            if let Some((base_url, api_key)) = app.prepare_fetch_site_models() {
-                // 同步获取模型（因为 TUI 主循环不是 async）
-                // 使用 tokio 的 block_on 或者显示提示让用户等待
-                fetch_site_models_sync(app, &base_url, &api_key);
-            }
-            true
-        }
-        // 搜索模型
-        KeyCode::Char('/') => {
-            if app.model_tab_focus == 1 && app.model_tab_provider.is_some() {
-                app.enter_search_mode();
-            }
-            true
-        }
-        _ => false,
     }
 }
 

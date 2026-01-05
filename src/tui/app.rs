@@ -34,20 +34,16 @@ pub struct App {
     pub config_manager: ConfigManager,
     /// Provider 名称列表
     pub providers: Vec<String>,
-    /// 当前 Model Tab 选中的 Provider
-    pub model_tab_provider: Option<String>,
     /// 当前 Provider 下的 Model 列表
     pub models: Vec<String>,
 
     // === UI 状态 ===
     /// Provider 列表状态
     pub provider_list_state: ListState,
-    /// Model Tab 中的 Provider 选择状态
-    pub model_provider_list_state: ListState,
     /// Model 列表状态
     pub model_list_state: ListState,
-    /// Model Tab 焦点区域 (0=Provider列表, 1=Model列表)
-    pub model_tab_focus: usize,
+    /// Provider Tab 焦点区域 (0=Provider列表, 1=Model列表)
+    pub provider_tab_focus: usize,
 
     // === 表单和对话框 ===
     /// Provider 表单
@@ -138,23 +134,17 @@ impl App {
         let mut multi_apply_list_state = ListState::default();
         multi_apply_list_state.select(Some(0));
 
-        // 初始化 Model Tab 的 Provider 列表状态
-        let mut model_provider_list_state = ListState::default();
-        model_provider_list_state.select(Some(0));
-
-        Ok(Self {
+        let mut app = Self {
             current_tab: AppTab::default(),
             input_mode: InputMode::default(),
             should_quit: false,
             help_visible: false,
             config_manager,
             providers,
-            model_tab_provider: None,
             models: Vec::new(),
             provider_list_state,
-            model_provider_list_state,
             model_list_state: ListState::default(),
-            model_tab_focus: 0,
+            provider_tab_focus: 0,
             provider_form,
             provider_form_mode: ProviderFormMode::Add,
             model_form,
@@ -170,7 +160,12 @@ impl App {
             multi_apply_list_state,
             status_message: None,
             operation_logs: Vec::new(),
-        })
+        };
+
+        // 初始化时加载第一个 Provider 的 Model 列表
+        app.refresh_models();
+
+        Ok(app)
     }
 
     /// 刷新 Provider 列表，同时同步所有相关状态
@@ -187,27 +182,17 @@ impl App {
         new_providers.sort();
         self.providers = new_providers;
 
-        // 同步 Model Tab 的 Provider 列表状态
+        // 调整 Provider 列表选中状态
         if self.providers.is_empty() {
-            self.model_provider_list_state.select(None);
-        } else if let Some(i) = self.model_provider_list_state.selected() {
+            self.provider_list_state.select(None);
+            self.models.clear();
+            self.model_list_state.select(None);
+        } else if let Some(i) = self.provider_list_state.selected() {
             if i >= self.providers.len() {
-                self.model_provider_list_state.select(Some(self.providers.len() - 1));
+                self.provider_list_state.select(Some(self.providers.len() - 1));
             }
-        }
-
-        // 检查 model_tab_provider 是否仍然有效
-        if let Some(ref provider_name) = self.model_tab_provider.clone() {
-            if !self.providers.contains(provider_name) {
-                // 被选中的 Provider 已被删除，清除 Model Tab 状态
-                self.model_tab_provider = None;
-                self.models.clear();
-                self.model_list_state.select(None);
-                self.model_tab_focus = 0; // 焦点回到 Provider 列表
-            } else {
-                // Provider 仍存在，刷新其 Model 列表
-                self.refresh_models();
-            }
+            // 刷新当前选中 Provider 的 Model 列表
+            self.refresh_models();
         }
 
         Ok(())
@@ -661,12 +646,12 @@ impl App {
         self.selected_providers.contains(&name.to_string())
     }
 
-    // === Model Tab 操作 ===
+    // === Model 操作 ===
 
-    /// 刷新 Model 列表
+    /// 刷新 Model 列表（基于当前选中的 Provider）
     pub fn refresh_models(&mut self) {
-        if let Some(provider_name) = &self.model_tab_provider {
-            if let Ok(models) = self.config_manager.opencode().get_models(provider_name) {
+        if let Some(provider_name) = self.get_selected_provider().cloned() {
+            if let Ok(models) = self.config_manager.opencode().get_models(&provider_name) {
                 let mut model_list: Vec<String> = models.keys().cloned().collect();
                 model_list.sort();
                 self.models = model_list;
@@ -691,54 +676,6 @@ impl App {
             self.models = Vec::new();
             self.model_list_state.select(None);
         }
-    }
-
-    /// 在 Model Tab 中选择 Provider
-    pub fn select_model_tab_provider(&mut self) {
-        if let Some(i) = self.model_provider_list_state.selected() {
-            if let Some(name) = self.providers.get(i) {
-                self.model_tab_provider = Some(name.clone());
-                self.model_list_state.select(Some(0));
-                self.refresh_models();
-                // 自动切换焦点到 Model 列表
-                self.model_tab_focus = 1;
-            }
-        }
-    }
-
-    /// Model Tab 中的 Provider 列表导航
-    pub fn select_next_model_provider(&mut self) {
-        if self.providers.is_empty() {
-            return;
-        }
-        let i = match self.model_provider_list_state.selected() {
-            Some(i) => {
-                if i >= self.providers.len() - 1 {
-                    0
-                } else {
-                    i + 1
-                }
-            }
-            None => 0,
-        };
-        self.model_provider_list_state.select(Some(i));
-    }
-
-    pub fn select_prev_model_provider(&mut self) {
-        if self.providers.is_empty() {
-            return;
-        }
-        let i = match self.model_provider_list_state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.providers.len() - 1
-                } else {
-                    i - 1
-                }
-            }
-            None => 0,
-        };
-        self.model_provider_list_state.select(Some(i));
     }
 
     /// Model 列表导航
@@ -783,16 +720,16 @@ impl App {
             .and_then(|i| self.models.get(i))
     }
 
-    /// 切换 Model Tab 焦点
-    pub fn toggle_model_tab_focus(&mut self) {
-        self.model_tab_focus = if self.model_tab_focus == 0 { 1 } else { 0 };
+    /// 设置 Provider Tab 焦点区域
+    pub fn set_provider_tab_focus(&mut self, focus: usize) {
+        self.provider_tab_focus = focus.min(1);
     }
 
     // === Model 表单操作 ===
 
     /// 打开添加 Model 表单
     pub fn open_add_model_form(&mut self) {
-        if self.model_tab_provider.is_none() {
+        if self.get_selected_provider().is_none() {
             self.show_error("请先选择一个 Provider");
             return;
         }
@@ -817,7 +754,7 @@ impl App {
 
         let model_id = self.model_form.get_value(0).unwrap_or("").to_string();
 
-        if let Some(provider_name) = &self.model_tab_provider.clone() {
+        if let Some(provider_name) = self.get_selected_provider().cloned() {
             // 创建 ModelInfo
             let model_info = crate::config::models::OpenCodeModelInfo {
                 name: model_id.clone(),
@@ -826,7 +763,7 @@ impl App {
             };
 
             let result = self.config_manager.opencode_mut().add_model(
-                provider_name,
+                &provider_name,
                 model_id.clone(),
                 model_info,
             );
@@ -859,9 +796,9 @@ impl App {
     /// 确认删除 Model
     pub fn confirm_delete_model(&mut self) {
         if let (Some(provider_name), Some(model_name)) =
-            (&self.model_tab_provider.clone(), self.get_selected_model().cloned())
+            (self.get_selected_provider().cloned(), self.get_selected_model().cloned())
         {
-            match self.config_manager.opencode_mut().delete_model(provider_name, &model_name) {
+            match self.config_manager.opencode_mut().delete_model(&provider_name, &model_name) {
                 Ok(_) => {
                     self.show_success(&format!("Model 已删除: {}", model_name));
                     self.log_operation(format!("删除 Model: {}", model_name), MessageType::Success);
@@ -879,12 +816,13 @@ impl App {
 
     /// 准备获取站点模型（显示加载状态）
     pub fn prepare_fetch_site_models(&mut self) -> Option<(String, String)> {
-        if self.model_tab_provider.is_none() {
-            self.show_error("请先选择一个 Provider");
-            return None;
-        }
-
-        let provider_name = self.model_tab_provider.as_ref().unwrap().clone();
+        let provider_name = match self.get_selected_provider().cloned() {
+            Some(name) => name,
+            None => {
+                self.show_error("请先选择一个 Provider");
+                return None;
+            }
+        };
 
         // 获取 Provider 信息
         if let Ok(Some(provider)) = self.config_manager.opencode().get_provider(&provider_name) {
@@ -942,7 +880,7 @@ impl App {
             return;
         }
 
-        if let Some(provider_name) = &self.model_tab_provider.clone() {
+        if let Some(provider_name) = self.get_selected_provider().cloned() {
             let mut success_count = 0;
             let mut fail_count = 0;
 
@@ -954,7 +892,7 @@ impl App {
                 };
 
                 match self.config_manager.opencode_mut().add_model(
-                    provider_name,
+                    &provider_name,
                     model_id.clone(),
                     model_info,
                 ) {
