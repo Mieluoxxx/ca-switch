@@ -72,7 +72,7 @@ pub fn render(frame: &mut Frame, app: &mut App, theme: &Theme) {
 /// 渲染顶部标题栏
 fn render_header(frame: &mut Frame, theme: &Theme, area: Rect) {
     let version = env!("CARGO_PKG_VERSION");
-    let title = format!(" 🚀 ca-switch v{} ", version);
+    let title = format!(" 🚀 opcd v{} ", version);
 
     let block = Block::default()
         .borders(Borders::ALL)
@@ -501,12 +501,12 @@ fn render_backup_tab(frame: &mut Frame, _app: &mut App, theme: &Theme, area: Rec
         Line::from(""),
         Line::from(vec![
             Span::raw("    "),
-            Span::styled("ca-switch backup", Style::default().fg(theme.info)),
+            Span::styled("opcd backup", Style::default().fg(theme.info)),
             Span::raw("        # 创建备份"),
         ]),
         Line::from(vec![
             Span::raw("    "),
-            Span::styled("ca-switch restore", Style::default().fg(theme.info)),
+            Span::styled("opcd restore", Style::default().fg(theme.info)),
             Span::raw("       # 恢复备份"),
         ]),
     ];
@@ -529,7 +529,7 @@ fn render_backup_tab(frame: &mut Frame, _app: &mut App, theme: &Theme, area: Rec
         Line::from(""),
         Line::from(vec![
             Span::raw("配置 WebDAV: "),
-            Span::styled("ca-switch webdav config", Style::default().fg(theme.primary)),
+            Span::styled("opcd webdav config", Style::default().fg(theme.primary)),
         ]),
     ];
 

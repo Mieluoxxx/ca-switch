@@ -1,4 +1,4 @@
-# ca-switch - OpenCode 配置管理工具
+# opcd - OpenCode 配置管理工具
 
 OpenCode 配置管理工具，支持多 Provider 和 Model 管理
 
@@ -9,18 +9,18 @@ OpenCode 配置管理工具，支持多 Provider 和 Model 管理
 ## 安装
 
 ```bash
-cargo install ca-switch
+cargo install opcd
 ```
 
 ## 使用
 
 ```bash
 # TUI 交互式界面（默认）
-ca-switch
+opcd
 
 # 其他
-ca-switch backup   # 备份恢复
-ca-switch status   # 查看状态
+opcd backup   # 备份恢复
+opcd status   # 查看状态
 ```
 
 ## 功能

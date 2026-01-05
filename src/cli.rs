@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand};
 
 /// Coding Agent 配置管理CLI工具
 #[derive(Parser)]
-#[command(name = "ca-switch")]
+#[command(name = "opcd")]
 #[command(author = "moguw <weiyiding0@gmail.com>")]
 #[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(about = "Coding Agent 配置管理CLI工具", long_about = None)]
