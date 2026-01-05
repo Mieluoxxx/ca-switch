@@ -1,6 +1,7 @@
 // 核心配置管理器
 // 负责管理全局 config.json 和协调各供应商配置管理器
 
+use crate::config::mcp_manager::McpConfigManager;
 use crate::config::opencode_manager::OpenCodeConfigManager;
 use crate::config::models::{
     OpenCodeActiveConfig, OpenCodeActiveReference,
@@ -13,6 +14,7 @@ use std::path::PathBuf;
 pub struct ConfigManager {
     global_config_file: PathBuf, // ~/.opcd/config.json
     opencode_manager: OpenCodeConfigManager,
+    mcp_manager: McpConfigManager,
 }
 
 impl ConfigManager {
@@ -28,9 +30,13 @@ impl ConfigManager {
         // 初始化 OpenCode 配置管理器
         let opencode_manager = OpenCodeConfigManager::new(config_dir.clone())?;
 
+        // 初始化 MCP 配置管理器
+        let mcp_manager = McpConfigManager::new(config_dir)?;
+
         Ok(Self {
             global_config_file,
             opencode_manager,
+            mcp_manager,
         })
     }
 
@@ -73,6 +79,20 @@ impl ConfigManager {
     /// 获取 OpenCode 配置管理器可变引用
     pub fn opencode_mut(&mut self) -> &mut OpenCodeConfigManager {
         &mut self.opencode_manager
+    }
+
+    // ========================================================================
+    // MCP 配置管理
+    // ========================================================================
+
+    /// 获取 MCP 配置管理器引用
+    pub fn mcp(&self) -> &McpConfigManager {
+        &self.mcp_manager
+    }
+
+    /// 获取 MCP 配置管理器可变引用
+    pub fn mcp_mut(&mut self) -> &mut McpConfigManager {
+        &mut self.mcp_manager
     }
 
     /// 获取当前激活的 OpenCode 配置

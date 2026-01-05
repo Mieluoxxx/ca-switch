@@ -6,7 +6,7 @@ use crate::config::ConfigManager;
 
 use super::{
     types::{AppTab, InputMode, LogEntry, MessageType, StatusMessage},
-    ui::components::{ApplyScopeDialog, ConfirmDialog, FormField, InputForm, MultiSelectDialog},
+    ui::components::{ApplyScopeDialog, ConfirmDialog, FormField, InputForm, McpServerForm, MultiSelectDialog},
 };
 
 /// Provider 表单类型
@@ -80,6 +80,24 @@ pub struct App {
     pub status_message: Option<StatusMessage>,
     /// 操作日志
     pub operation_logs: Vec<LogEntry>,
+
+    // === MCP 相关状态 ===
+    /// MCP 服务器名称列表
+    pub mcp_servers: Vec<String>,
+    /// MCP 服务器列表状态
+    pub mcp_list_state: ListState,
+    /// MCP 服务器表单
+    pub mcp_form: McpServerForm,
+    /// MCP 删除对话框
+    pub mcp_delete_dialog: ConfirmDialog,
+    /// MCP 应用范围对话框
+    pub mcp_apply_scope_dialog: ApplyScopeDialog,
+    /// 是否处于 MCP 多选同步模式
+    pub is_mcp_multi_sync_mode: bool,
+    /// 已选择的 MCP 服务器
+    pub selected_mcp_servers: Vec<String>,
+    /// MCP 多选列表状态
+    pub mcp_multi_list_state: ListState,
 }
 
 impl App {
@@ -134,6 +152,32 @@ impl App {
         let mut multi_apply_list_state = ListState::default();
         multi_apply_list_state.select(Some(0));
 
+        // === MCP 相关初始化 ===
+        // 获取 MCP 服务器列表
+        let mcp_servers = config_manager
+            .mcp()
+            .get_sorted_server_names()
+            .unwrap_or_default();
+
+        let mut mcp_list_state = ListState::default();
+        if !mcp_servers.is_empty() {
+            mcp_list_state.select(Some(0));
+        }
+
+        // 创建 MCP 表单
+        let mcp_form = McpServerForm::new();
+
+        // 创建 MCP 删除对话框
+        let mcp_delete_dialog = ConfirmDialog::new("确认删除", "确定要删除这个 MCP 服务器吗？")
+            .with_buttons("删除", "取消");
+
+        // 创建 MCP 应用范围对话框
+        let mcp_apply_scope_dialog = ApplyScopeDialog::new();
+
+        // 初始化 MCP 多选列表状态
+        let mut mcp_multi_list_state = ListState::default();
+        mcp_multi_list_state.select(Some(0));
+
         let mut app = Self {
             current_tab: AppTab::default(),
             input_mode: InputMode::default(),
@@ -160,6 +204,15 @@ impl App {
             multi_apply_list_state,
             status_message: None,
             operation_logs: Vec::new(),
+            // MCP 相关字段
+            mcp_servers,
+            mcp_list_state,
+            mcp_form,
+            mcp_delete_dialog,
+            mcp_apply_scope_dialog,
+            is_mcp_multi_sync_mode: false,
+            selected_mcp_servers: Vec::new(),
+            mcp_multi_list_state,
         };
 
         // 初始化时加载第一个 Provider 的 Model 列表
@@ -960,6 +1013,375 @@ impl App {
                 .filter(|m| m.to_lowercase().contains(&query_lower))
                 .collect()
         }
+    }
+
+    // ========================================================================
+    // MCP 服务器操作
+    // ========================================================================
+
+    /// 刷新 MCP 服务器列表
+    pub fn refresh_mcp_servers(&mut self) {
+        self.mcp_servers = self
+            .config_manager
+            .mcp()
+            .get_sorted_server_names()
+            .unwrap_or_default();
+
+        // 调整选中状态
+        if self.mcp_servers.is_empty() {
+            self.mcp_list_state.select(None);
+        } else if let Some(i) = self.mcp_list_state.selected() {
+            if i >= self.mcp_servers.len() {
+                self.mcp_list_state.select(Some(self.mcp_servers.len() - 1));
+            }
+        } else {
+            self.mcp_list_state.select(Some(0));
+        }
+    }
+
+    /// 选择下一个 MCP 服务器
+    pub fn select_next_mcp_server(&mut self) {
+        if self.mcp_servers.is_empty() {
+            return;
+        }
+        let i = match self.mcp_list_state.selected() {
+            Some(i) => {
+                if i >= self.mcp_servers.len() - 1 {
+                    0
+                } else {
+                    i + 1
+                }
+            }
+            None => 0,
+        };
+        self.mcp_list_state.select(Some(i));
+    }
+
+    /// 选择上一个 MCP 服务器
+    pub fn select_prev_mcp_server(&mut self) {
+        if self.mcp_servers.is_empty() {
+            return;
+        }
+        let i = match self.mcp_list_state.selected() {
+            Some(i) => {
+                if i == 0 {
+                    self.mcp_servers.len() - 1
+                } else {
+                    i - 1
+                }
+            }
+            None => 0,
+        };
+        self.mcp_list_state.select(Some(i));
+    }
+
+    /// 获取当前选中的 MCP 服务器名称
+    pub fn get_selected_mcp_server(&self) -> Option<&String> {
+        self.mcp_list_state
+            .selected()
+            .and_then(|i| self.mcp_servers.get(i))
+    }
+
+    /// 打开添加 MCP 服务器表单
+    pub fn open_add_mcp_form(&mut self) {
+        self.mcp_form.show_create();
+        self.input_mode = InputMode::Editing;
+    }
+
+    /// 打开编辑 MCP 服务器表单
+    pub fn open_edit_mcp_form(&mut self) {
+        if let Some(server_name) = self.get_selected_mcp_server().cloned() {
+            // 优先读取原始 JSON 内容
+            if let Ok(Some(raw_json)) = self.config_manager.mcp().get_raw_json(&server_name) {
+                self.mcp_form.show_edit_raw(&server_name, &raw_json);
+                self.input_mode = InputMode::Editing;
+            }
+        }
+    }
+
+    /// 关闭 MCP 表单
+    pub fn close_mcp_form(&mut self) {
+        self.mcp_form.hide();
+        self.input_mode = InputMode::Normal;
+    }
+
+    /// 提交 MCP 表单
+    pub fn submit_mcp_form(&mut self) {
+        // 解析用户输入的原始 JSON
+        let (name, config_json) = match self.mcp_form.parse_raw_json() {
+            Ok(result) => result,
+            Err(e) => {
+                // 显示错误并提示正确格式
+                self.mcp_form.error_message = Some(format!(
+                    "{}\n正确格式: {{ \"服务器名\": {{ \"command\": \"...\", \"args\": [...] }} }}",
+                    e
+                ));
+                self.show_error("JSON 格式错误，请查看编辑器底部提示");
+                return;
+            }
+        };
+
+        if name.is_empty() {
+            self.mcp_form.error_message = Some("服务器名称不能为空".to_string());
+            self.show_error("服务器名称不能为空");
+            return;
+        }
+
+        // 验证配置 JSON 内容
+        if let Err(e) = serde_json::from_str::<serde_json::Value>(&config_json) {
+            self.mcp_form.error_message = Some(format!("配置内容格式错误: {}", e));
+            self.show_error("配置内容格式错误");
+            return;
+        }
+
+        // 编辑模式下，如果名称变化，需要删除旧文件
+        if self.mcp_form.is_edit_mode {
+            if let Some(old_name) = &self.mcp_form.edit_server_name.clone() {
+                if old_name != &name {
+                    let _ = self.config_manager.mcp_mut().delete_server(old_name);
+                }
+            }
+        }
+
+        // 直接保存用户原始 JSON 配置
+        let result = self.config_manager.mcp_mut().save_raw_json(&name, &config_json);
+
+        match result {
+            Ok(_) => {
+                let action = if self.mcp_form.is_edit_mode { "更新" } else { "添加" };
+                self.show_success(&format!("MCP 服务器 {} 成功: {}", action, name));
+                self.log_operation(format!("MCP 服务器 {} 成功: {}", action, name), MessageType::Success);
+                self.refresh_mcp_servers();
+                self.close_mcp_form();
+            }
+            Err(e) => {
+                self.show_error(&format!("操作失败: {}", e));
+            }
+        }
+    }
+
+    /// 打开 MCP 删除对话框
+    pub fn open_mcp_delete_dialog(&mut self) {
+        if let Some(name) = self.get_selected_mcp_server() {
+            self.mcp_delete_dialog.message = format!("确定要删除 MCP 服务器 \"{}\" 吗？\n此操作无法撤销。", name);
+            self.mcp_delete_dialog.show();
+        }
+    }
+
+    /// 确认删除 MCP 服务器
+    pub fn confirm_delete_mcp_server(&mut self) {
+        if let Some(name) = self.get_selected_mcp_server().cloned() {
+            match self.config_manager.mcp_mut().delete_server(&name) {
+                Ok(_) => {
+                    self.show_success(&format!("MCP 服务器已删除: {}", name));
+                    self.log_operation(format!("删除 MCP 服务器: {}", name), MessageType::Success);
+                    self.refresh_mcp_servers();
+                }
+                Err(e) => {
+                    self.show_error(&format!("删除失败: {}", e));
+                }
+            }
+        }
+        self.mcp_delete_dialog.hide();
+    }
+
+    /// 切换 MCP 服务器启用状态
+    pub fn toggle_mcp_server_enabled(&mut self) {
+        if let Some(name) = self.get_selected_mcp_server().cloned() {
+            match self.config_manager.mcp_mut().toggle_server_enabled(&name) {
+                Ok(new_state) => {
+                    let status = if new_state { "启用" } else { "禁用" };
+                    self.show_success(&format!("MCP 服务器已{}: {}", status, name));
+                    self.log_operation(format!("{}MCP 服务器: {}", status, name), MessageType::Info);
+                    self.refresh_mcp_servers();
+                }
+                Err(e) => {
+                    self.show_error(&format!("操作失败: {}", e));
+                }
+            }
+        }
+    }
+
+    // === MCP 多选同步模式 ===
+
+    /// 进入 MCP 多选同步模式
+    pub fn enter_mcp_multi_sync_mode(&mut self) {
+        if self.mcp_servers.is_empty() {
+            return;
+        }
+        self.is_mcp_multi_sync_mode = true;
+        self.selected_mcp_servers.clear();
+        // 默认选中当前高亮的服务器
+        if let Some(idx) = self.mcp_list_state.selected() {
+            if let Some(name) = self.mcp_servers.get(idx) {
+                self.selected_mcp_servers.push(name.clone());
+            }
+        }
+        self.mcp_multi_list_state.select(Some(0));
+    }
+
+    /// 退出 MCP 多选同步模式
+    pub fn exit_mcp_multi_sync_mode(&mut self) {
+        self.is_mcp_multi_sync_mode = false;
+        self.selected_mcp_servers.clear();
+    }
+
+    /// 在 MCP 多选模式下切换选择状态
+    pub fn toggle_mcp_server_selection(&mut self) {
+        if let Some(idx) = self.mcp_multi_list_state.selected() {
+            if let Some(name) = self.mcp_servers.get(idx) {
+                if self.selected_mcp_servers.contains(name) {
+                    self.selected_mcp_servers.retain(|s| s != name);
+                } else {
+                    self.selected_mcp_servers.push(name.clone());
+                }
+            }
+        }
+    }
+
+    /// MCP 多选模式下选择下一个
+    pub fn select_next_mcp_multi(&mut self) {
+        if self.mcp_servers.is_empty() {
+            return;
+        }
+        let i = match self.mcp_multi_list_state.selected() {
+            Some(i) => {
+                if i >= self.mcp_servers.len() - 1 {
+                    0
+                } else {
+                    i + 1
+                }
+            }
+            None => 0,
+        };
+        self.mcp_multi_list_state.select(Some(i));
+    }
+
+    /// MCP 多选模式下选择上一个
+    pub fn select_prev_mcp_multi(&mut self) {
+        if self.mcp_servers.is_empty() {
+            return;
+        }
+        let i = match self.mcp_multi_list_state.selected() {
+            Some(i) => {
+                if i == 0 {
+                    self.mcp_servers.len() - 1
+                } else {
+                    i - 1
+                }
+            }
+            None => 0,
+        };
+        self.mcp_multi_list_state.select(Some(i));
+    }
+
+    /// 确认选择的 MCP 服务器，打开同步范围对话框
+    /// 空选择时表示清空目标配置中的 MCP 配置
+    pub fn confirm_selected_mcp_servers(&mut self) {
+        if self.selected_mcp_servers.is_empty() {
+            // 空选择 = 清空 MCP 配置
+            self.mcp_apply_scope_dialog.show_clear_mcp();
+        } else {
+            self.mcp_apply_scope_dialog.show_multiple(&self.selected_mcp_servers);
+        }
+        self.is_mcp_multi_sync_mode = false;
+    }
+
+    /// 执行 MCP 配置同步
+    /// 空选择时清空目标配置中的 MCP 配置
+    pub fn execute_mcp_sync(&mut self) {
+        let apply_to_global = self.mcp_apply_scope_dialog.apply_to_global;
+        let apply_to_project = self.mcp_apply_scope_dialog.apply_to_project;
+        let target_description = self.mcp_apply_scope_dialog.get_target_description();
+        let server_names: Vec<String> = self.selected_mcp_servers.clone();
+        let is_clear_mode = server_names.is_empty();
+
+        // 同步到全局
+        if apply_to_global {
+            // 空列表会清空 mcp 配置
+            match self.config_manager.mcp().sync_to_opencode(Some(&server_names)) {
+                Ok(_) => {
+                    if is_clear_mode {
+                        self.show_success("已清空全局 MCP 配置");
+                    } else {
+                        self.show_success(&format!(
+                            "已同步到全局配置 ({} 个 MCP 服务器)",
+                            server_names.len()
+                        ));
+                    }
+                }
+                Err(e) => {
+                    self.show_error(&format!("同步到全局配置失败: {}", e));
+                }
+            }
+        }
+
+        // 同步到项目
+        if apply_to_project {
+            match self.config_manager.mcp().sync_to_project(Some(&server_names)) {
+                Ok(_) => {
+                    if is_clear_mode {
+                        self.show_success("已清空项目 MCP 配置");
+                    } else {
+                        self.show_success(&format!(
+                            "已同步到当前项目 ({} 个 MCP 服务器)",
+                            server_names.len()
+                        ));
+                    }
+                }
+                Err(e) => {
+                    self.show_error(&format!("同步到项目失败: {}", e));
+                }
+            }
+        }
+
+        // 记录操作日志
+        let log_msg = if is_clear_mode {
+            format!("清空 MCP 配置: {}", target_description)
+        } else {
+            format!(
+                "同步 {} 个 MCP 服务器到: {}",
+                server_names.len(),
+                target_description
+            )
+        };
+        self.log_operation(log_msg, MessageType::Success);
+
+        // 清理状态
+        self.selected_mcp_servers.clear();
+        self.mcp_apply_scope_dialog.hide();
+    }
+
+    /// 获取 MCP 多选模式下当前高亮的服务器名称
+    pub fn get_mcp_multi_current(&self) -> Option<&String> {
+        self.mcp_multi_list_state
+            .selected()
+            .and_then(|i| self.mcp_servers.get(i))
+    }
+
+    /// 检查 MCP 服务器是否被选中
+    pub fn is_mcp_server_selected(&self, name: &str) -> bool {
+        self.selected_mcp_servers.contains(&name.to_string())
+    }
+
+    /// 获取已选择的 MCP 服务器数量
+    pub fn get_selected_mcp_count(&self) -> usize {
+        self.selected_mcp_servers.len()
+    }
+
+    /// 获取 MCP 服务器总数
+    pub fn get_mcp_server_count(&self) -> usize {
+        self.mcp_servers.len()
+    }
+
+    /// 全选 MCP 服务器
+    pub fn select_all_mcp_servers(&mut self) {
+        self.selected_mcp_servers = self.mcp_servers.clone();
+    }
+
+    /// 清空 MCP 服务器选择
+    pub fn clear_mcp_selection(&mut self) {
+        self.selected_mcp_servers.clear();
     }
 }
 

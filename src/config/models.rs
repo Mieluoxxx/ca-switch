@@ -339,6 +339,355 @@ pub struct ModelDetectionResult {
     pub error_message: Option<String>,
 }
 
+// ============================================================================
+// MCP 配置 (mcp.json)
+// ============================================================================
+
+/// MCP 配置文件结构
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct McpConfig {
+    #[serde(default = "default_mcp_version")]
+    pub version: String,
+    #[serde(default)]
+    pub servers: HashMap<String, McpServer>,
+    // TODO: 后续迭代添加工具和代理工具配置
+    // pub tools: HashMap<String, bool>,
+    // pub agent_tools: HashMap<String, HashMap<String, bool>>,
+}
+
+fn default_mcp_version() -> String {
+    "1.0.0".to_string()
+}
+
+/// MCP 服务器类型
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum McpServerType {
+    Local,
+    Remote,
+}
+
+impl Default for McpServerType {
+    fn default() -> Self {
+        McpServerType::Local
+    }
+}
+
+impl std::fmt::Display for McpServerType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            McpServerType::Local => write!(f, "local"),
+            McpServerType::Remote => write!(f, "remote"),
+        }
+    }
+}
+
+/// MCP 服务器配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct McpServer {
+    /// 服务器类型
+    #[serde(rename = "type")]
+    pub server_type: McpServerType,
+
+    /// 是否启用
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+
+    /// 请求超时时间(毫秒)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timeout: Option<u32>,
+
+    // === 本地服务器字段 ===
+    /// 启动命令
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub command: Option<Vec<String>>,
+
+    /// 环境变量
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub environment: HashMap<String, String>,
+
+    // === 远程服务器字段 ===
+    /// 远程 URL
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+
+    /// HTTP Headers
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub headers: HashMap<String, String>,
+
+    /// OAuth 配置
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub oauth: Option<McpOAuthConfig>,
+
+    // === 内部元数据 ===
+    #[serde(skip)]
+    pub metadata: McpServerMetadata,
+}
+
+fn default_enabled() -> bool {
+    true
+}
+
+/// MCP OAuth 配置
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct McpOAuthConfig {
+    /// Client ID (支持 {env:VAR} 格式)
+    #[serde(rename = "clientId", skip_serializing_if = "Option::is_none")]
+    pub client_id: Option<String>,
+
+    /// Client Secret (支持 {env:VAR} 格式)
+    #[serde(rename = "clientSecret", skip_serializing_if = "Option::is_none")]
+    pub client_secret: Option<String>,
+
+    /// OAuth Scope
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scope: Option<String>,
+}
+
+/// MCP 服务器元数据 (仅用于内部管理)
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct McpServerMetadata {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default = "default_timestamp")]
+    pub created_at: String,
+    #[serde(default = "default_timestamp")]
+    pub updated_at: String,
+}
+
+// ============================================================================
+// MCP 实现方法
+// ============================================================================
+
+impl McpConfig {
+    /// 创建新的 MCP 配置
+    pub fn new() -> Self {
+        Self {
+            version: default_mcp_version(),
+            servers: HashMap::new(),
+        }
+    }
+
+    /// 获取服务器
+    pub fn get_server(&self, name: &str) -> Option<&McpServer> {
+        self.servers.get(name)
+    }
+
+    /// 获取可变服务器
+    pub fn get_server_mut(&mut self, name: &str) -> Option<&mut McpServer> {
+        self.servers.get_mut(name)
+    }
+
+    /// 添加服务器
+    pub fn add_server(&mut self, name: String, server: McpServer) {
+        self.servers.insert(name, server);
+    }
+
+    /// 删除服务器
+    pub fn remove_server(&mut self, name: &str) -> Option<McpServer> {
+        self.servers.remove(name)
+    }
+
+    /// 获取按名称排序的服务器列表
+    pub fn get_sorted_server_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self.servers.keys().cloned().collect();
+        names.sort();
+        names
+    }
+}
+
+impl Default for McpConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl McpServer {
+    /// 从 JSON Value 解析创建 McpServer
+    /// 支持两种格式：
+    /// 1. 本地服务器: { "command": "npx", "args": [...], "env": {...} }
+    /// 2. 远程服务器: { "url": "https://...", "headers": {...}, "oauth": {...} }
+    pub fn from_json(json: &serde_json::Value) -> Result<Self, String> {
+        // 判断是本地还是远程服务器
+        let is_local = json.get("command").is_some() || json.get("args").is_some();
+        let is_remote = json.get("url").is_some();
+
+        if is_local {
+            Self::parse_local_from_json(json)
+        } else if is_remote {
+            Self::parse_remote_from_json(json)
+        } else {
+            // 无法识别的格式，创建空本地服务器
+            Ok(Self::new_local(Vec::new(), HashMap::new()))
+        }
+    }
+
+    /// 解析本地服务器配置
+    fn parse_local_from_json(json: &serde_json::Value) -> Result<Self, String> {
+        let mut command = Vec::new();
+        if let Some(cmd) = json.get("command").and_then(|v| v.as_str()) {
+            command.push(cmd.to_string());
+        }
+        if let Some(args) = json.get("args").and_then(|v| v.as_array()) {
+            for arg in args {
+                if let Some(s) = arg.as_str() {
+                    command.push(s.to_string());
+                }
+            }
+        }
+
+        let mut environment = HashMap::new();
+        if let Some(env) = json.get("env").and_then(|v| v.as_object()) {
+            for (k, v) in env {
+                if let Some(s) = v.as_str() {
+                    environment.insert(k.clone(), s.to_string());
+                }
+            }
+        }
+
+        let timeout = json.get("timeout").and_then(|v| v.as_u64()).map(|v| v as u32);
+        let enabled = json.get("enabled").and_then(|v| v.as_bool()).unwrap_or(true);
+
+        Ok(Self {
+            server_type: McpServerType::Local,
+            enabled,
+            timeout,
+            command: Some(command),
+            environment,
+            url: None,
+            headers: HashMap::new(),
+            oauth: None,
+            metadata: McpServerMetadata::default(),
+        })
+    }
+
+    /// 解析远程服务器配置
+    fn parse_remote_from_json(json: &serde_json::Value) -> Result<Self, String> {
+        let url = json.get("url").and_then(|v| v.as_str()).unwrap_or("").to_string();
+
+        let mut headers = HashMap::new();
+        if let Some(h) = json.get("headers").and_then(|v| v.as_object()) {
+            for (k, v) in h {
+                if let Some(s) = v.as_str() {
+                    headers.insert(k.clone(), s.to_string());
+                }
+            }
+        }
+
+        let oauth = if let Some(o) = json.get("oauth").and_then(|v| v.as_object()) {
+            let client_id = o.get("clientId").and_then(|v| v.as_str()).map(|s| s.to_string());
+            let client_secret = o.get("clientSecret").and_then(|v| v.as_str()).map(|s| s.to_string());
+            let scope = o.get("scope").and_then(|v| v.as_str()).map(|s| s.to_string());
+            if client_id.is_some() || client_secret.is_some() || scope.is_some() {
+                Some(McpOAuthConfig { client_id, client_secret, scope })
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let timeout = json.get("timeout").and_then(|v| v.as_u64()).map(|v| v as u32);
+        let enabled = json.get("enabled").and_then(|v| v.as_bool()).unwrap_or(true);
+
+        Ok(Self {
+            server_type: McpServerType::Remote,
+            enabled,
+            timeout,
+            command: None,
+            environment: HashMap::new(),
+            url: Some(url),
+            headers,
+            oauth,
+            metadata: McpServerMetadata::default(),
+        })
+    }
+
+    /// 创建本地 MCP 服务器
+    pub fn new_local(command: Vec<String>, environment: HashMap<String, String>) -> Self {
+        Self {
+            server_type: McpServerType::Local,
+            enabled: true,
+            timeout: None,
+            command: Some(command),
+            environment,
+            url: None,
+            headers: HashMap::new(),
+            oauth: None,
+            metadata: McpServerMetadata {
+                description: None,
+                created_at: default_timestamp(),
+                updated_at: default_timestamp(),
+            },
+        }
+    }
+
+    /// 创建远程 MCP 服务器
+    pub fn new_remote(url: String, headers: HashMap<String, String>, oauth: Option<McpOAuthConfig>) -> Self {
+        Self {
+            server_type: McpServerType::Remote,
+            enabled: true,
+            timeout: None,
+            command: None,
+            environment: HashMap::new(),
+            url: Some(url),
+            headers,
+            oauth,
+            metadata: McpServerMetadata {
+                description: None,
+                created_at: default_timestamp(),
+                updated_at: default_timestamp(),
+            },
+        }
+    }
+
+    /// 更新时间戳
+    pub fn update_timestamp(&mut self) {
+        self.metadata.updated_at = default_timestamp();
+    }
+
+    /// 获取显示用的类型名称
+    pub fn type_display(&self) -> &'static str {
+        match self.server_type {
+            McpServerType::Local => "本地",
+            McpServerType::Remote => "远程",
+        }
+    }
+
+    /// 获取摘要信息（用于列表显示）
+    pub fn summary(&self) -> String {
+        match self.server_type {
+            McpServerType::Local => {
+                self.command
+                    .as_ref()
+                    .and_then(|c| c.first())
+                    .cloned()
+                    .unwrap_or_else(|| "未配置命令".to_string())
+            }
+            McpServerType::Remote => {
+                self.url
+                    .as_ref()
+                    .cloned()
+                    .unwrap_or_else(|| "未配置 URL".to_string())
+            }
+        }
+    }
+
+    /// 检查是否配置了 OAuth
+    pub fn has_oauth(&self) -> bool {
+        self.oauth.as_ref().map_or(false, |o| {
+            o.client_id.is_some() || o.client_secret.is_some()
+        })
+    }
+}
+
+impl McpOAuthConfig {
+    /// 检查是否为空配置
+    pub fn is_empty(&self) -> bool {
+        self.client_id.is_none() && self.client_secret.is_none() && self.scope.is_none()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -355,5 +704,37 @@ mod tests {
         let config = OpenCodeConfig::new();
         assert_eq!(config.version, "3.0.0");
         assert!(config.providers.is_empty());
+    }
+
+    #[test]
+    fn test_mcp_config_creation() {
+        let config = McpConfig::new();
+        assert_eq!(config.version, "1.0.0");
+        assert!(config.servers.is_empty());
+    }
+
+    #[test]
+    fn test_mcp_local_server() {
+        let server = McpServer::new_local(
+            vec!["npx".to_string(), "-y".to_string(), "test-server".to_string()],
+            HashMap::new(),
+        );
+        assert_eq!(server.server_type, McpServerType::Local);
+        assert!(server.enabled);
+        assert!(server.command.is_some());
+        assert!(server.url.is_none());
+    }
+
+    #[test]
+    fn test_mcp_remote_server() {
+        let server = McpServer::new_remote(
+            "https://mcp.example.com".to_string(),
+            HashMap::new(),
+            None,
+        );
+        assert_eq!(server.server_type, McpServerType::Remote);
+        assert!(server.enabled);
+        assert!(server.url.is_some());
+        assert!(server.command.is_none());
     }
 }
