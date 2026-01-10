@@ -103,12 +103,24 @@ impl ApplyScopeDialog {
     /// 显示对话框（多个Provider）
     pub fn show_multiple(&mut self, provider_names: &[String]) {
         self.provider_names = provider_names.to_vec();
+        self.title = "应用配置".to_string();
         // 显示第一个或摘要信息
         if provider_names.len() == 1 {
             self.provider_name = provider_names[0].clone();
         } else {
             self.provider_name = format!("{} 个 Provider", provider_names.len());
         }
+        self.visible = true;
+        self.apply_to_global = true;
+        self.apply_to_project = false;
+        self.selected_option = 0;
+    }
+
+    /// 显示清空 MCP 配置对话框（空选择时使用）
+    pub fn show_clear_mcp(&mut self) {
+        self.provider_names.clear();
+        self.title = "清空 MCP 配置".to_string();
+        self.provider_name = "将清空目标配置中的所有 MCP 服务器".to_string();
         self.visible = true;
         self.apply_to_global = true;
         self.apply_to_project = false;
@@ -192,14 +204,28 @@ impl ApplyScopeDialog {
             ])
             .split(inner_area);
 
-        // 1-2. Provider 名称
-        let name_label = Paragraph::new("Provider:")
-            .style(theme.muted_style());
-        frame.render_widget(name_label, content_layout[0]);
+        // 1-2. 名称信息（根据模式显示不同内容）
+        let is_clear_mode = self.title.contains("清空");
+        if is_clear_mode {
+            // 清空模式：显示警告提示
+            let warning = Paragraph::new("⚠ 注意:")
+                .style(Style::default().fg(theme.warning).add_modifier(Modifier::BOLD));
+            frame.render_widget(warning, content_layout[0]);
 
-        let name_value = Paragraph::new(self.provider_name.clone())
-            .style(Style::default().fg(theme.primary).add_modifier(Modifier::BOLD));
-        frame.render_widget(name_value, content_layout[1]);
+            let name_value = Paragraph::new(self.provider_name.clone())
+                .style(Style::default().fg(theme.warning));
+            frame.render_widget(name_value, content_layout[1]);
+        } else {
+            // 正常模式：显示 Provider/MCP 服务器信息
+            let label = if self.title.contains("MCP") { "MCP 服务器:" } else { "Provider:" };
+            let name_label = Paragraph::new(label)
+                .style(theme.muted_style());
+            frame.render_widget(name_label, content_layout[0]);
+
+            let name_value = Paragraph::new(self.provider_name.clone())
+                .style(Style::default().fg(theme.primary).add_modifier(Modifier::BOLD));
+            frame.render_widget(name_value, content_layout[1]);
+        }
 
         // 3. 空行
         let spacer = Paragraph::new("");
@@ -256,9 +282,19 @@ impl ApplyScopeDialog {
 
         // 6. 当前选择状态
         let target = self.get_target_description();
-        let status_text = format!("将应用到: {}", target);
+        let (status_text, status_style) = if is_clear_mode {
+            (
+                format!("将清空: {} 的 MCP 配置", target),
+                Style::default().fg(theme.warning).add_modifier(Modifier::BOLD),
+            )
+        } else {
+            (
+                format!("将应用到: {}", target),
+                Style::default().fg(theme.success).add_modifier(Modifier::BOLD),
+            )
+        };
         let status = Paragraph::new(status_text)
-            .style(Style::default().fg(theme.success).add_modifier(Modifier::BOLD))
+            .style(status_style)
             .alignment(Alignment::Center);
         frame.render_widget(status, content_layout[6]);
     }

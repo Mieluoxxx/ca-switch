@@ -14,6 +14,35 @@ use crate::tui::{
     types::{AppTab, MessageType},
 };
 
+// ============================================================================
+// 布局常量
+// ============================================================================
+
+/// Provider Tab 三栏布局比例
+mod provider_tab_layout {
+    pub const PROVIDER_LIST_PERCENT: u16 = 25;
+    pub const MODEL_LIST_PERCENT: u16 = 30;
+    pub const DETAIL_PANEL_PERCENT: u16 = 45;
+}
+
+/// MCP Tab 两栏布局比例
+mod mcp_tab_layout {
+    pub const SERVER_LIST_PERCENT: u16 = 35;
+    pub const DETAIL_PANEL_PERCENT: u16 = 65;
+}
+
+/// 多选模式布局比例
+mod multi_select_layout {
+    pub const LIST_PERCENT: u16 = 40;
+    pub const DETAIL_PERCENT: u16 = 60;
+}
+
+/// 帮助弹窗尺寸
+mod help_popup_layout {
+    pub const WIDTH_PERCENT: u16 = 60;
+    pub const HEIGHT_PERCENT: u16 = 70;
+}
+
 /// 渲染主界面
 pub fn render(frame: &mut Frame, app: &mut App, theme: &Theme) {
     // 清理过期消息
@@ -58,6 +87,15 @@ pub fn render(frame: &mut Frame, app: &mut App, theme: &Theme) {
     // 模型多选对话框
     app.model_select_dialog.render(frame, theme, full_area);
 
+    // MCP 表单
+    app.mcp_form.render(frame, theme, full_area);
+
+    // MCP 删除对话框
+    app.mcp_delete_dialog.render(frame, theme, full_area);
+
+    // MCP 同步范围对话框
+    app.mcp_apply_scope_dialog.render(frame, theme, full_area);
+
     // 帮助弹窗
     if app.help_visible {
         render_help_popup(frame, theme, full_area);
@@ -94,6 +132,7 @@ fn render_tabs(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
         .map(|tab| {
             let icon = match tab {
                 AppTab::Providers => "🔌",
+                AppTab::Mcp => "🧩",
                 AppTab::Backup => "💾",
                 AppTab::Status => "📊",
             };
@@ -123,6 +162,7 @@ fn render_tabs(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
 fn render_content(frame: &mut Frame, app: &mut App, theme: &Theme, area: Rect) {
     match app.current_tab {
         AppTab::Providers => render_providers_tab(frame, app, theme, area),
+        AppTab::Mcp => render_mcp_tab(frame, app, theme, area),
         AppTab::Backup => render_backup_tab(frame, app, theme, area),
         AppTab::Status => render_status_tab(frame, app, theme, area),
     }
@@ -136,13 +176,13 @@ fn render_providers_tab(frame: &mut Frame, app: &mut App, theme: &Theme, area: R
         return;
     }
 
-    // 三栏布局：Provider列表(25%) + Model列表(30%) + 详情面板(45%)
+    // 三栏布局：Provider列表 + Model列表 + 详情面板
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Percentage(25),
-            Constraint::Percentage(30),
-            Constraint::Percentage(45),
+            Constraint::Percentage(provider_tab_layout::PROVIDER_LIST_PERCENT),
+            Constraint::Percentage(provider_tab_layout::MODEL_LIST_PERCENT),
+            Constraint::Percentage(provider_tab_layout::DETAIL_PANEL_PERCENT),
         ])
         .split(area);
 
@@ -287,7 +327,10 @@ fn render_providers_tab(frame: &mut Frame, app: &mut App, theme: &Theme, area: R
 fn render_providers_multi_select_mode(frame: &mut Frame, app: &mut App, theme: &Theme, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
+        .constraints([
+            Constraint::Percentage(multi_select_layout::LIST_PERCENT),
+            Constraint::Percentage(multi_select_layout::DETAIL_PERCENT),
+        ])
         .split(area);
 
     // 左侧: Provider 列表（带选择状态）
@@ -296,14 +339,20 @@ fn render_providers_multi_select_mode(frame: &mut Frame, app: &mut App, theme: &
         .iter()
         .map(|name| {
             let is_selected = app.is_provider_selected(name);
-            let prefix = if is_selected { "☑" } else { "☐" };
+            let (prefix, prefix_style) = if is_selected {
+                ("☑", Style::default().fg(theme.success).add_modifier(Modifier::BOLD))
+            } else {
+                ("☐", Style::default().fg(theme.muted))
+            };
             let name_style = if is_selected {
                 Style::default().fg(theme.success)
             } else {
                 Style::default().fg(theme.fg)
             };
             ListItem::new(Line::from(vec![
-                Span::raw(format!(" {} ", prefix)),
+                Span::raw(" "),
+                Span::styled(prefix, prefix_style),
+                Span::raw(" "),
                 Span::styled(name.clone(), name_style),
             ]))
         })
@@ -460,6 +509,327 @@ fn format_token_count(count: u64) -> String {
         format!("{}k", count / 1000)
     } else {
         count.to_string()
+    }
+}
+
+/// 渲染 MCP Tab（两栏布局：服务器列表 + 详情面板）
+fn render_mcp_tab(frame: &mut Frame, app: &mut App, theme: &Theme, area: Rect) {
+    // 多选同步模式使用特殊布局
+    if app.is_mcp_multi_sync_mode {
+        render_mcp_multi_sync_mode(frame, app, theme, area);
+        return;
+    }
+
+    // 两栏布局：服务器列表 + 详情面板
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(mcp_tab_layout::SERVER_LIST_PERCENT),
+            Constraint::Percentage(mcp_tab_layout::DETAIL_PANEL_PERCENT),
+        ])
+        .split(area);
+
+    // 左侧: MCP 服务器列表
+    let server_items: Vec<ListItem> = app
+        .mcp_servers
+        .iter()
+        .map(|name| {
+            // 获取服务器信息
+            let (icon, enabled) = if let Ok(Some(server)) = app.config_manager.mcp().get_server(name) {
+                let icon = match server.server_type {
+                    crate::config::models::McpServerType::Local => "📦",
+                    crate::config::models::McpServerType::Remote => "🌐",
+                };
+                let enabled = server.enabled;
+                (icon, enabled)
+            } else {
+                ("📦", true)
+            };
+
+            let status = if enabled { "✓" } else { "✗" };
+            let status_style = if enabled {
+                Style::default().fg(theme.success)
+            } else {
+                Style::default().fg(theme.error)
+            };
+
+            ListItem::new(Line::from(vec![
+                Span::raw(format!(" {} ", icon)),
+                Span::styled(name.clone(), Style::default().fg(theme.fg)),
+                Span::raw(" "),
+                Span::styled(status, status_style),
+            ]))
+        })
+        .collect();
+
+    let server_list = List::new(server_items)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(theme.active_border_style())
+                .title(format!(" MCP 服务器 ({}) ", app.mcp_servers.len())),
+        )
+        .highlight_style(theme.highlight_style())
+        .highlight_symbol("▶ ");
+
+    frame.render_stateful_widget(server_list, chunks[0], &mut app.mcp_list_state);
+
+    // 右侧: 详情面板
+    render_mcp_detail_panel(frame, app, theme, chunks[1]);
+}
+
+/// 渲染 MCP 多选同步模式
+fn render_mcp_multi_sync_mode(frame: &mut Frame, app: &mut App, theme: &Theme, area: Rect) {
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(multi_select_layout::LIST_PERCENT),
+            Constraint::Percentage(multi_select_layout::DETAIL_PERCENT),
+        ])
+        .split(area);
+
+    // 左侧: 服务器列表（带选择状态）
+    let items: Vec<ListItem> = app
+        .mcp_servers
+        .iter()
+        .map(|name| {
+            let is_selected = app.is_mcp_server_selected(name);
+            let (prefix, prefix_style) = if is_selected {
+                ("☑", Style::default().fg(theme.success).add_modifier(Modifier::BOLD))
+            } else {
+                ("☐", Style::default().fg(theme.muted))
+            };
+
+            // 获取服务器类型图标
+            let icon = if let Ok(Some(server)) = app.config_manager.mcp().get_server(name) {
+                match server.server_type {
+                    crate::config::models::McpServerType::Local => "📦",
+                    crate::config::models::McpServerType::Remote => "🌐",
+                }
+            } else {
+                "📦"
+            };
+
+            let name_style = if is_selected {
+                Style::default().fg(theme.success)
+            } else {
+                Style::default().fg(theme.fg)
+            };
+
+            ListItem::new(Line::from(vec![
+                Span::raw(" "),
+                Span::styled(prefix, prefix_style),
+                Span::raw(format!(" {} ", icon)),
+                Span::styled(name.clone(), name_style),
+            ]))
+        })
+        .collect();
+
+    let list = List::new(items)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(theme.active_border_style())
+                .title(format!(
+                    " 多选同步 ({}/{}) ",
+                    app.get_selected_mcp_count(),
+                    app.get_mcp_server_count()
+                )),
+        )
+        .highlight_style(theme.highlight_style())
+        .highlight_symbol("▶ ");
+
+    frame.render_stateful_widget(list, chunks[0], &mut app.mcp_multi_list_state);
+
+    // 右侧: 操作说明
+    let detail_block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(theme.border_style())
+        .title(Span::styled(" 多选同步模式 ", theme.title_style()));
+
+    let inner = detail_block.inner(chunks[1]);
+    frame.render_widget(detail_block, chunks[1]);
+
+    if let Some(server_name) = app.get_mcp_multi_current() {
+        if let Ok(Some(server)) = app.config_manager.mcp().get_server(server_name) {
+            let is_selected = app.is_mcp_server_selected(server_name);
+            let status = if is_selected { "✓ 已选择" } else { "○ 未选择" };
+
+            let type_str = match server.server_type {
+                crate::config::models::McpServerType::Local => "本地",
+                crate::config::models::McpServerType::Remote => "远程",
+            };
+
+            let details = vec![
+                Line::from(vec![
+                    Span::styled("当前项: ", Style::default().add_modifier(Modifier::BOLD)),
+                    Span::styled(server_name, Style::default().fg(theme.primary)),
+                    Span::styled(format!("  [{}]", status), theme.success_style()),
+                ]),
+                Line::from(vec![
+                    Span::styled("类型: ", Style::default().add_modifier(Modifier::BOLD)),
+                    Span::styled(type_str, theme.muted_style()),
+                ]),
+                Line::from(""),
+                Line::from(Span::styled(
+                    "快捷键:",
+                    Style::default().add_modifier(Modifier::BOLD),
+                )),
+                Line::from("  [Space] 切换选择    [↑/k] 上移    [↓/j] 下移"),
+                Line::from("  [Enter] 确认同步    [Esc] 取消    [A] 全选    [C] 清空"),
+            ];
+
+            let paragraph = Paragraph::new(details).wrap(Wrap { trim: true });
+            frame.render_widget(paragraph, inner);
+        }
+    } else {
+        let empty = Paragraph::new("没有 MCP 服务器")
+            .style(theme.muted_style())
+            .wrap(Wrap { trim: true });
+        frame.render_widget(empty, inner);
+    }
+}
+
+/// 渲染 MCP 详情面板
+fn render_mcp_detail_panel(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
+    let detail_block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(theme.border_style())
+        .title(Span::styled(" 详情 ", theme.title_style()));
+
+    let inner = detail_block.inner(area);
+    frame.render_widget(detail_block, area);
+
+    if let Some(server_name) = app.get_selected_mcp_server() {
+        if let Ok(Some(server)) = app.config_manager.mcp().get_server(server_name) {
+            let type_str = match server.server_type {
+                crate::config::models::McpServerType::Local => "本地 📦",
+                crate::config::models::McpServerType::Remote => "远程 🌐",
+            };
+
+            let status_str = if server.enabled { "✓ 已启用" } else { "✗ 已禁用" };
+            let status_style = if server.enabled {
+                theme.success_style()
+            } else {
+                theme.error_style()
+            };
+
+            let mut lines = vec![
+                Line::from(Span::styled(
+                    "服务器信息",
+                    Style::default().add_modifier(Modifier::BOLD),
+                )),
+                Line::from(vec![
+                    Span::styled("  名称: ", theme.muted_style()),
+                    Span::styled(server_name, Style::default().fg(theme.primary)),
+                ]),
+                Line::from(vec![
+                    Span::styled("  类型: ", theme.muted_style()),
+                    Span::styled(type_str, Style::default().fg(theme.info)),
+                ]),
+                Line::from(vec![
+                    Span::styled("  状态: ", theme.muted_style()),
+                    Span::styled(status_str, status_style),
+                ]),
+            ];
+
+            // 根据类型显示不同信息
+            match server.server_type {
+                crate::config::models::McpServerType::Local => {
+                    if let Some(ref cmd) = server.command {
+                        lines.push(Line::from(""));
+                        lines.push(Line::from(Span::styled(
+                            "命令:",
+                            Style::default().add_modifier(Modifier::BOLD),
+                        )));
+                        lines.push(Line::from(vec![
+                            Span::styled("  ", theme.muted_style()),
+                            Span::styled(cmd.join(" "), Style::default().fg(theme.fg)),
+                        ]));
+                    }
+
+                    if !server.environment.is_empty() {
+                        lines.push(Line::from(""));
+                        lines.push(Line::from(Span::styled(
+                            "环境变量:",
+                            Style::default().add_modifier(Modifier::BOLD),
+                        )));
+                        for (key, value) in &server.environment {
+                            lines.push(Line::from(vec![
+                                Span::styled(format!("  {}: ", key), theme.muted_style()),
+                                Span::styled(value, Style::default().fg(theme.fg)),
+                            ]));
+                        }
+                    }
+                }
+                crate::config::models::McpServerType::Remote => {
+                    if let Some(ref url) = server.url {
+                        lines.push(Line::from(""));
+                        lines.push(Line::from(vec![
+                            Span::styled("URL: ", Style::default().add_modifier(Modifier::BOLD)),
+                            Span::styled(url, Style::default().fg(theme.info)),
+                        ]));
+                    }
+
+                    if !server.headers.is_empty() {
+                        lines.push(Line::from(""));
+                        lines.push(Line::from(Span::styled(
+                            "Headers:",
+                            Style::default().add_modifier(Modifier::BOLD),
+                        )));
+                        for (key, _) in &server.headers {
+                            lines.push(Line::from(vec![
+                                Span::styled(format!("  {}: ", key), theme.muted_style()),
+                                Span::styled("********", Style::default().fg(theme.fg)),
+                            ]));
+                        }
+                    }
+
+                    if let Some(ref oauth) = server.oauth {
+                        lines.push(Line::from(""));
+                        lines.push(Line::from(Span::styled(
+                            "OAuth 配置:",
+                            Style::default().add_modifier(Modifier::BOLD),
+                        )));
+                        if oauth.client_id.is_some() {
+                            lines.push(Line::from(vec![
+                                Span::styled("  Client ID: ", theme.muted_style()),
+                                Span::styled("已配置", Style::default().fg(theme.success)),
+                            ]));
+                        }
+                        if oauth.client_secret.is_some() {
+                            lines.push(Line::from(vec![
+                                Span::styled("  Client Secret: ", theme.muted_style()),
+                                Span::styled("已配置", Style::default().fg(theme.success)),
+                            ]));
+                        }
+                        if let Some(ref scope) = oauth.scope {
+                            lines.push(Line::from(vec![
+                                Span::styled("  Scope: ", theme.muted_style()),
+                                Span::styled(scope, Style::default().fg(theme.fg)),
+                            ]));
+                        }
+                    }
+                }
+            }
+
+            // 超时配置
+            if let Some(timeout) = server.timeout {
+                lines.push(Line::from(""));
+                lines.push(Line::from(vec![
+                    Span::styled("超时: ", Style::default().add_modifier(Modifier::BOLD)),
+                    Span::styled(format!("{}ms", timeout), Style::default().fg(theme.fg)),
+                ]));
+            }
+
+            let paragraph = Paragraph::new(lines).wrap(Wrap { trim: true });
+            frame.render_widget(paragraph, inner);
+        }
+    } else {
+        let text = Paragraph::new("选择一个 MCP 服务器查看详情")
+            .style(theme.muted_style())
+            .wrap(Wrap { trim: true });
+        frame.render_widget(text, inner);
     }
 }
 
@@ -669,6 +1039,13 @@ fn render_footer(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
                 "[h/l]切换面板 [j/k]导航 [a]添加 [d]删除 [/]搜索 [t]获取模型"
             }
         }
+        AppTab::Mcp => {
+            if app.is_mcp_multi_sync_mode {
+                "[j/↓]下移 [k/↑]上移 [Space]选择 [Enter]确认 [A]全选 [C]清空 [Esc]取消"
+            } else {
+                "[j/k]导航 [a]添加 [e]编辑 [d]删除 [Space]启用/禁用 [Enter]同步"
+            }
+        }
         AppTab::Backup => "[b]备份 [r]恢复 [d]删除",
         AppTab::Status => "[r]刷新",
     };
@@ -755,7 +1132,11 @@ fn parse_shortcuts_with_highlight<'a>(text: &str, theme: &Theme) -> Vec<Span<'a>
 
 /// 渲染帮助弹窗
 fn render_help_popup(frame: &mut Frame, theme: &Theme, area: Rect) {
-    let popup_area = centered_rect(60, 70, area);
+    let popup_area = centered_rect(
+        help_popup_layout::WIDTH_PERCENT,
+        help_popup_layout::HEIGHT_PERCENT,
+        area,
+    );
 
     frame.render_widget(Clear, popup_area);
 

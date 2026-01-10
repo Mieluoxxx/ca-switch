@@ -3,6 +3,7 @@
 
 pub mod models;
 pub mod opencode_manager;
+pub mod mcp_manager;
 pub mod manager;
 pub mod detector;
 
@@ -10,3 +11,4 @@ pub mod detector;
 pub use manager::*;
 pub use models::*;
 pub use detector::*;
+// McpConfigManager 通过 manager.rs 使用

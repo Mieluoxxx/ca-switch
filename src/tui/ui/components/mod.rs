@@ -4,8 +4,10 @@ mod dialog;
 mod input_form;
 mod multi_select;
 mod apply_scope_dialog;
+mod mcp_form;
 
 pub use dialog::{ConfirmDialog, DialogResult};
 pub use input_form::{FormField, InputForm};
 pub use multi_select::MultiSelectDialog;
 pub use apply_scope_dialog::ApplyScopeDialog;
+pub use mcp_form::McpServerForm;

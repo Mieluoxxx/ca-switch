@@ -49,6 +49,21 @@ pub fn handle_key_event(app: &mut App, key: KeyEvent) -> bool {
         return handle_model_select_dialog(app, key);
     }
 
+    // MCP 删除对话框
+    if app.mcp_delete_dialog.visible {
+        return handle_mcp_delete_dialog(app, key);
+    }
+
+    // MCP 应用范围对话框
+    if app.mcp_apply_scope_dialog.visible {
+        return handle_mcp_apply_scope_dialog(app, key);
+    }
+
+    // MCP 表单
+    if app.mcp_form.visible {
+        return handle_mcp_form(app, key);
+    }
+
     // 搜索模式
     if app.search_active {
         return handle_search_mode(app, key);
@@ -233,6 +248,7 @@ fn handle_editing_mode(app: &mut App, key: KeyEvent) -> bool {
 fn handle_tab_specific_key(app: &mut App, key: KeyEvent) -> bool {
     match app.current_tab {
         AppTab::Providers => handle_provider_tab_key(app, key),
+        AppTab::Mcp => handle_mcp_tab_key(app, key),
         AppTab::Backup => handle_backup_tab_key(app, key),
         AppTab::Status => handle_status_tab_key(app, key),
     }
@@ -600,6 +616,242 @@ fn handle_search_mode(app: &mut App, key: KeyEvent) -> bool {
         }
         KeyCode::Char(c) => {
             app.handle_search_input(c);
+            true
+        }
+        _ => true,
+    }
+}
+
+// ============================================================================
+// MCP Tab 事件处理
+// ============================================================================
+
+/// MCP Tab 按键处理
+fn handle_mcp_tab_key(app: &mut App, key: KeyEvent) -> bool {
+    // 如果处于多选同步模式
+    if app.is_mcp_multi_sync_mode {
+        return handle_mcp_multi_sync_mode(app, key);
+    }
+
+    match key.code {
+        // 导航
+        KeyCode::Down | KeyCode::Char('j') => {
+            app.select_next_mcp_server();
+            true
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.select_prev_mcp_server();
+            true
+        }
+        // 添加 MCP 服务器
+        KeyCode::Char('a') => {
+            app.open_add_mcp_form();
+            true
+        }
+        // 编辑 MCP 服务器
+        KeyCode::Char('e') => {
+            app.open_edit_mcp_form();
+            true
+        }
+        // 删除 MCP 服务器
+        KeyCode::Char('d') => {
+            app.open_mcp_delete_dialog();
+            true
+        }
+        // 切换启用状态
+        KeyCode::Char(' ') => {
+            app.toggle_mcp_server_enabled();
+            true
+        }
+        // 同步配置 - 进入多选模式
+        KeyCode::Enter => {
+            app.enter_mcp_multi_sync_mode();
+            true
+        }
+        _ => false,
+    }
+}
+
+/// MCP 多选同步模式按键处理
+fn handle_mcp_multi_sync_mode(app: &mut App, key: KeyEvent) -> bool {
+    match key.code {
+        // 导航
+        KeyCode::Down | KeyCode::Char('j') => {
+            app.select_next_mcp_multi();
+            true
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.select_prev_mcp_multi();
+            true
+        }
+        // 切换选择状态
+        KeyCode::Char(' ') => {
+            app.toggle_mcp_server_selection();
+            true
+        }
+        // 确认选择，打开同步范围对话框
+        KeyCode::Enter => {
+            app.confirm_selected_mcp_servers();
+            true
+        }
+        // 取消多选模式
+        KeyCode::Esc => {
+            app.exit_mcp_multi_sync_mode();
+            true
+        }
+        // 全选
+        KeyCode::Char('A') => {
+            app.select_all_mcp_servers();
+            true
+        }
+        // 清空选择
+        KeyCode::Char('C') => {
+            app.clear_mcp_selection();
+            true
+        }
+        _ => false,
+    }
+}
+
+/// 处理 MCP 删除对话框
+fn handle_mcp_delete_dialog(app: &mut App, key: KeyEvent) -> bool {
+    match key.code {
+        KeyCode::Left | KeyCode::Right | KeyCode::Tab | KeyCode::Char('h') | KeyCode::Char('l') => {
+            app.mcp_delete_dialog.toggle_selection();
+            true
+        }
+        KeyCode::Enter => {
+            let result = app.mcp_delete_dialog.confirm();
+            if result == DialogResult::Confirm {
+                app.confirm_delete_mcp_server();
+            } else {
+                app.mcp_delete_dialog.hide();
+            }
+            true
+        }
+        KeyCode::Esc | KeyCode::Char('q') => {
+            app.mcp_delete_dialog.hide();
+            true
+        }
+        KeyCode::Char('y') => {
+            app.mcp_delete_dialog.selected = 0;
+            app.confirm_delete_mcp_server();
+            true
+        }
+        KeyCode::Char('n') => {
+            app.mcp_delete_dialog.hide();
+            true
+        }
+        _ => true,
+    }
+}
+
+/// 处理 MCP 应用范围对话框
+fn handle_mcp_apply_scope_dialog(app: &mut App, key: KeyEvent) -> bool {
+    match key.code {
+        KeyCode::Left | KeyCode::Right | KeyCode::Tab | KeyCode::Char('h') | KeyCode::Char('l') => {
+            app.mcp_apply_scope_dialog.toggle_option();
+            true
+        }
+        KeyCode::Enter => {
+            app.execute_mcp_sync();
+            true
+        }
+        KeyCode::Esc | KeyCode::Char('q') => {
+            app.mcp_apply_scope_dialog.hide();
+            true
+        }
+        _ => true,
+    }
+}
+
+/// 处理 MCP 表单输入（纯 JSON 编辑器模式）
+fn handle_mcp_form(app: &mut App, key: KeyEvent) -> bool {
+    // 如果正在显示关闭确认对话框
+    if app.mcp_form.confirm_close {
+        return handle_mcp_form_close_confirm(app, key);
+    }
+
+    match key.code {
+        KeyCode::Esc => {
+            // 检查是否有未保存的修改
+            if app.mcp_form.request_close() {
+                app.close_mcp_form();
+            }
+            // 如果有修改，request_close 会设置 confirm_close = true
+            true
+        }
+        // Ctrl+S 保存
+        KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            app.submit_mcp_form();
+            true
+        }
+        // Ctrl+T 切换服务器类型模板
+        KeyCode::Char('t') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            app.mcp_form.toggle_mode();
+            true
+        }
+        // Ctrl+D 清空内容（切换到空模板）
+        KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            app.mcp_form.clear_to_empty();
+            true
+        }
+        // Enter 换行
+        KeyCode::Enter => {
+            app.mcp_form.handle_enter();
+            true
+        }
+        // 方向键导航
+        KeyCode::Up => {
+            app.mcp_form.cursor_up();
+            true
+        }
+        KeyCode::Down => {
+            app.mcp_form.cursor_down();
+            true
+        }
+        KeyCode::Left => {
+            app.mcp_form.cursor_left();
+            true
+        }
+        KeyCode::Right => {
+            app.mcp_form.cursor_right();
+            true
+        }
+        KeyCode::Backspace => {
+            app.mcp_form.handle_backspace();
+            true
+        }
+        KeyCode::Delete => {
+            app.mcp_form.handle_delete();
+            true
+        }
+        KeyCode::Char(c) => {
+            app.mcp_form.handle_input(c);
+            true
+        }
+        _ => true,
+    }
+}
+
+/// 处理 MCP 表单关闭确认对话框
+fn handle_mcp_form_close_confirm(app: &mut App, key: KeyEvent) -> bool {
+    match key.code {
+        // Y - 确认放弃修改
+        KeyCode::Char('y') | KeyCode::Char('Y') => {
+            app.mcp_form.confirm_discard();
+            app.close_mcp_form();
+            true
+        }
+        // N 或 Esc - 取消，继续编辑
+        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+            app.mcp_form.cancel_close();
+            true
+        }
+        // Ctrl+S - 保存
+        KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            app.mcp_form.cancel_close();
+            app.submit_mcp_form();
             true
         }
         _ => true,
