@@ -1,6 +1,7 @@
 // 主题系统模块
 
 use ratatui::style::{Color, Modifier, Style};
+use ratatui::widgets::BorderType;
 
 /// 应用主题
 #[derive(Debug, Clone)]
@@ -59,6 +60,11 @@ impl Theme {
     /// 激活边框样式
     pub fn active_border_style(&self) -> Style {
         Style::default().fg(self.primary)
+    }
+
+    /// 激活状态的边框类型（双线边框，用于在颜色失效时标识焦点）
+    pub fn active_border_type(&self) -> BorderType {
+        BorderType::Double
     }
 
     /// 成功消息样式

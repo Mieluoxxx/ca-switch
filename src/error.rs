@@ -23,14 +23,12 @@ pub enum CliError {
     Custom(String),
 }
 
-// 实现 From<String> 转换，方便新架构使用
 impl From<String> for CliError {
     fn from(s: String) -> Self {
         CliError::Custom(s)
     }
 }
 
-// 实现 From<&str> 转换
 impl From<&str> for CliError {
     fn from(s: &str) -> Self {
         CliError::Custom(s.to_string())
