@@ -1,9 +1,7 @@
 // OpenCode 配置管理器
 // 负责管理 ~/.opcd/opencode.json 和同步到 ~/.opencode/opencode.json
 
-use crate::config::models::{
-    OpenCodeActiveConfig, OpenCodeConfig, OpenCodeModelInfo, OpenCodeProvider,
-};
+use crate::config::models::{OpenCodeConfig, OpenCodeModelInfo, OpenCodeProvider};
 use crate::config::ConfigError;
 use serde_json;
 use std::collections::HashMap;
@@ -185,44 +183,21 @@ impl OpenCodeConfigManager {
         self.write_config(&config)
     }
 
-    pub fn sync_to_opencode(&self, active_config: &OpenCodeActiveConfig) -> Result<(), String> {
-        ensure_dir_exists(&self.home_dir)?;
-        let config = self.read_config()?;
-        let providers = std::slice::from_ref(&active_config.provider);
-        sync_providers_to_file(&config, providers, &self.home_json)
-    }
-
     pub fn sync_multiple_providers_to_opencode(
         &self,
         provider_names: &[String],
     ) -> Result<(), String> {
-        ensure_dir_exists(&self.home_dir)?;
         let config = self.read_config()?;
-        sync_providers_to_file(&config, provider_names, &self.home_json)
-    }
-
-    pub fn sync_to_project(&self, active_config: &OpenCodeActiveConfig) -> Result<(), String> {
-        let project_dir = std::env::current_dir()
-            .map_err(|e| format!("获取当前目录失败: {}", e))?
-            .join(".opencode");
-        let project_json = project_dir.join("opencode.json");
-        ensure_dir_exists(&project_dir)?;
-        let config = self.read_config()?;
-        let providers = std::slice::from_ref(&active_config.provider);
-        sync_providers_to_file(&config, providers, &project_json)
+        sync_providers(&config, provider_names, &self.home_dir, &self.home_json)
     }
 
     pub fn sync_multiple_providers_to_project(
         &self,
         provider_names: &[String],
     ) -> Result<(), String> {
-        let project_dir = std::env::current_dir()
-            .map_err(|e| format!("获取当前目录失败: {}", e))?
-            .join(".opencode");
-        let project_json = project_dir.join("opencode.json");
-        ensure_dir_exists(&project_dir)?;
         let config = self.read_config()?;
-        sync_providers_to_file(&config, provider_names, &project_json)
+        let (project_dir, project_json) = get_project_opencode_paths()?;
+        sync_providers(&config, provider_names, &project_dir, &project_json)
     }
 }
 
@@ -233,19 +208,39 @@ fn ensure_dir_exists(path: &PathBuf) -> Result<(), String> {
     Ok(())
 }
 
+fn get_project_opencode_paths() -> Result<(PathBuf, PathBuf), String> {
+    let project_dir = std::env::current_dir()
+        .map_err(|e| format!("获取当前目录失败: {}", e))?
+        .join(".opencode");
+    let project_json = project_dir.join("opencode.json");
+    Ok((project_dir, project_json))
+}
+
+fn sync_providers(
+    config: &OpenCodeConfig,
+    provider_names: &[String],
+    dir: &PathBuf,
+    json_path: &PathBuf,
+) -> Result<(), String> {
+    ensure_dir_exists(dir)?;
+    sync_providers_to_file(config, provider_names, json_path)
+}
+
 fn sync_providers_to_file(
     config: &OpenCodeConfig,
     provider_names: &[String],
     target_path: &PathBuf,
 ) -> Result<(), String> {
-    let mut providers_map = serde_json::Map::new();
-    for name in provider_names {
-        if let Some(provider) = config.get_provider(name) {
-            let value = serde_json::to_value(provider)
-                .map_err(|e| format!("序列化 Provider '{}' 失败: {}", name, e))?;
-            providers_map.insert(name.clone(), value);
-        }
-    }
+    let providers_map: serde_json::Map<String, serde_json::Value> = provider_names
+        .iter()
+        .filter_map(|name| {
+            config.get_provider(name).and_then(|provider| {
+                serde_json::to_value(provider)
+                    .ok()
+                    .map(|value| (name.clone(), value))
+            })
+        })
+        .collect();
 
     let sync_data = serde_json::json!({
         "$schema": "https://opencode.ai/config.json",

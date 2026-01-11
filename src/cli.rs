@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 
 /// Coding Agent 配置管理CLI工具
 #[derive(Parser)]
@@ -19,31 +19,13 @@ pub enum Commands {
     /// 导出配置
     Export {
         /// 要导出的配置类型
-        #[arg(value_name = "TYPE")]
+        #[arg(value_enum)]
         config_type: ExportType,
     },
 }
 
-#[derive(Clone, Debug)]
+#[derive(ValueEnum, Clone, Debug)]
 pub enum ExportType {
+    #[value(name = "opencode")]
     OpenCode,
-}
-
-impl std::str::FromStr for ExportType {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "opencode" => Ok(ExportType::OpenCode),
-            _ => Err(format!("不支持的配置类型: {}", s)),
-        }
-    }
-}
-
-impl std::fmt::Display for ExportType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ExportType::OpenCode => write!(f, "opencode"),
-        }
-    }
 }
