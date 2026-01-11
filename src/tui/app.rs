@@ -232,6 +232,51 @@ impl App {
         Ok(app)
     }
 
+    /// 通用循环导航辅助函数
+    fn cyclic_navigate_forward<T>(list: &[T], list_state: &mut ListState) {
+        if list.is_empty() {
+            return;
+        }
+        let i = match list_state.selected() {
+            Some(i) => {
+                if i >= list.len() - 1 {
+                    0
+                } else {
+                    i + 1
+                }
+            }
+            None => 0,
+        };
+        list_state.select(Some(i));
+    }
+
+    /// 通用循环导航辅助函数（向后）
+    fn cyclic_navigate_backward<T>(list: &[T], list_state: &mut ListState) {
+        if list.is_empty() {
+            return;
+        }
+        let i = match list_state.selected() {
+            Some(i) => {
+                if i == 0 {
+                    list.len() - 1
+                } else {
+                    i - 1
+                }
+            }
+            None => 0,
+        };
+        list_state.select(Some(i));
+    }
+
+    /// 通用切换选择辅助函数
+    fn toggle_selection(item: &String, selected: &mut Vec<String>) {
+        if selected.contains(item) {
+            selected.retain(|p| p != item);
+        } else {
+            selected.push(item.clone());
+        }
+    }
+
     /// 刷新 Provider 列表，同时同步所有相关状态
     pub fn refresh_providers(&mut self) -> Result<(), String> {
         // 获取最新的 Provider 列表并排序（保持稳定顺序）
@@ -329,38 +374,12 @@ impl App {
 
     /// 选择下一个 Provider
     pub fn select_next_provider(&mut self) {
-        if self.providers.is_empty() {
-            return;
-        }
-        let i = match self.provider_list_state.selected() {
-            Some(i) => {
-                if i >= self.providers.len() - 1 {
-                    0
-                } else {
-                    i + 1
-                }
-            }
-            None => 0,
-        };
-        self.provider_list_state.select(Some(i));
+        Self::cyclic_navigate_forward(&self.providers, &mut self.provider_list_state);
     }
 
     /// 选择上一个 Provider
     pub fn select_prev_provider(&mut self) {
-        if self.providers.is_empty() {
-            return;
-        }
-        let i = match self.provider_list_state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.providers.len() - 1
-                } else {
-                    i - 1
-                }
-            }
-            None => 0,
-        };
-        self.provider_list_state.select(Some(i));
+        Self::cyclic_navigate_backward(&self.providers, &mut self.provider_list_state);
     }
 
     /// 获取当前选中的 Provider 名称
@@ -588,49 +607,19 @@ impl App {
     pub fn toggle_provider_selection(&mut self) {
         if let Some(idx) = self.multi_apply_list_state.selected() {
             if let Some(name) = self.providers.get(idx) {
-                if self.selected_providers.contains(name) {
-                    self.selected_providers.retain(|p| p != name);
-                } else {
-                    self.selected_providers.push(name.clone());
-                }
+                Self::toggle_selection(name, &mut self.selected_providers);
             }
         }
     }
 
     /// 多选模式下选择下一个 Provider
     pub fn select_next_multi_apply(&mut self) {
-        if self.providers.is_empty() {
-            return;
-        }
-        let i = match self.multi_apply_list_state.selected() {
-            Some(i) => {
-                if i >= self.providers.len() - 1 {
-                    0
-                } else {
-                    i + 1
-                }
-            }
-            None => 0,
-        };
-        self.multi_apply_list_state.select(Some(i));
+        Self::cyclic_navigate_forward(&self.providers, &mut self.multi_apply_list_state);
     }
 
     /// 多选模式下选择上一个 Provider
     pub fn select_prev_multi_apply(&mut self) {
-        if self.providers.is_empty() {
-            return;
-        }
-        let i = match self.multi_apply_list_state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.providers.len() - 1
-                } else {
-                    i - 1
-                }
-            }
-            None => 0,
-        };
-        self.multi_apply_list_state.select(Some(i));
+        Self::cyclic_navigate_backward(&self.providers, &mut self.multi_apply_list_state);
     }
 
     /// 获取多选模式下当前高亮的 Provider 名称
@@ -765,37 +754,11 @@ impl App {
 
     /// Model 列表导航
     pub fn select_next_model(&mut self) {
-        if self.models.is_empty() {
-            return;
-        }
-        let i = match self.model_list_state.selected() {
-            Some(i) => {
-                if i >= self.models.len() - 1 {
-                    0
-                } else {
-                    i + 1
-                }
-            }
-            None => 0,
-        };
-        self.model_list_state.select(Some(i));
+        Self::cyclic_navigate_forward(&self.models, &mut self.model_list_state);
     }
 
     pub fn select_prev_model(&mut self) {
-        if self.models.is_empty() {
-            return;
-        }
-        let i = match self.model_list_state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.models.len() - 1
-                } else {
-                    i - 1
-                }
-            }
-            None => 0,
-        };
-        self.model_list_state.select(Some(i));
+        Self::cyclic_navigate_backward(&self.models, &mut self.model_list_state);
     }
 
     /// 获取当前选中的 Model 名称
@@ -1079,38 +1042,12 @@ impl App {
 
     /// 选择下一个 MCP 服务器
     pub fn select_next_mcp_server(&mut self) {
-        if self.mcp_servers.is_empty() {
-            return;
-        }
-        let i = match self.mcp_list_state.selected() {
-            Some(i) => {
-                if i >= self.mcp_servers.len() - 1 {
-                    0
-                } else {
-                    i + 1
-                }
-            }
-            None => 0,
-        };
-        self.mcp_list_state.select(Some(i));
+        Self::cyclic_navigate_forward(&self.mcp_servers, &mut self.mcp_list_state);
     }
 
     /// 选择上一个 MCP 服务器
     pub fn select_prev_mcp_server(&mut self) {
-        if self.mcp_servers.is_empty() {
-            return;
-        }
-        let i = match self.mcp_list_state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.mcp_servers.len() - 1
-                } else {
-                    i - 1
-                }
-            }
-            None => 0,
-        };
-        self.mcp_list_state.select(Some(i));
+        Self::cyclic_navigate_backward(&self.mcp_servers, &mut self.mcp_list_state);
     }
 
     /// 获取当前选中的 MCP 服务器名称
@@ -1282,49 +1219,19 @@ impl App {
     pub fn toggle_mcp_server_selection(&mut self) {
         if let Some(idx) = self.mcp_multi_list_state.selected() {
             if let Some(name) = self.mcp_servers.get(idx) {
-                if self.selected_mcp_servers.contains(name) {
-                    self.selected_mcp_servers.retain(|s| s != name);
-                } else {
-                    self.selected_mcp_servers.push(name.clone());
-                }
+                Self::toggle_selection(name, &mut self.selected_mcp_servers);
             }
         }
     }
 
     /// MCP 多选模式下选择下一个
     pub fn select_next_mcp_multi(&mut self) {
-        if self.mcp_servers.is_empty() {
-            return;
-        }
-        let i = match self.mcp_multi_list_state.selected() {
-            Some(i) => {
-                if i >= self.mcp_servers.len() - 1 {
-                    0
-                } else {
-                    i + 1
-                }
-            }
-            None => 0,
-        };
-        self.mcp_multi_list_state.select(Some(i));
+        Self::cyclic_navigate_forward(&self.mcp_servers, &mut self.mcp_multi_list_state);
     }
 
     /// MCP 多选模式下选择上一个
     pub fn select_prev_mcp_multi(&mut self) {
-        if self.mcp_servers.is_empty() {
-            return;
-        }
-        let i = match self.mcp_multi_list_state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.mcp_servers.len() - 1
-                } else {
-                    i - 1
-                }
-            }
-            None => 0,
-        };
-        self.mcp_multi_list_state.select(Some(i));
+        Self::cyclic_navigate_backward(&self.mcp_servers, &mut self.mcp_multi_list_state);
     }
 
     /// 确认选择的 MCP 服务器，打开同步范围对话框
