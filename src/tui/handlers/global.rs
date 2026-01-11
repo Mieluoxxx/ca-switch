@@ -151,6 +151,22 @@ fn handle_apply_scope_dialog(app: &mut App, key: KeyEvent) -> bool {
             app.apply_scope_dialog.toggle_option();
             true
         }
+        KeyCode::Down | KeyCode::Char('j') => {
+            app.apply_scope_dialog.selected_option =
+                (app.apply_scope_dialog.selected_option + 1) % 3;
+            app.apply_scope_dialog.update_state_from_option();
+            true
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.apply_scope_dialog.selected_option = if app.apply_scope_dialog.selected_option == 0
+            {
+                2
+            } else {
+                app.apply_scope_dialog.selected_option - 1
+            };
+            app.apply_scope_dialog.update_state_from_option();
+            true
+        }
         KeyCode::Enter => {
             app.execute_apply_config();
             true

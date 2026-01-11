@@ -140,6 +140,15 @@ impl ApplyScopeDialog {
     /// 切换选项
     pub fn toggle_option(&mut self) {
         self.selected_option = (self.selected_option + 1) % 3;
+        self.update_state_from_option();
+    }
+
+    /// 根据当前 selected_option 的值更新 apply_to_global 和 apply_to_project 状态
+    ///
+    /// - selected_option = 0: 仅全局配置 (apply_to_global=true, apply_to_project=false)
+    /// - selected_option = 1: 仅项目配置 (apply_to_global=false, apply_to_project=true)
+    /// - selected_option = 2: 两者都应用 (apply_to_global=true, apply_to_project=true)
+    pub fn update_state_from_option(&mut self) {
         match self.selected_option {
             0 => {
                 self.apply_to_global = true;
@@ -286,7 +295,7 @@ impl ApplyScopeDialog {
 
         // 5. 操作提示
         let hint = Text::from(vec![Line::from(vec![
-            Span::styled("←/→/Tab: 切换选项  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("↑/↓/j/k: 切换选项  ", Style::default().fg(Color::DarkGray)),
             Span::styled("Enter: 确认", Style::default().fg(Color::DarkGray)),
             Span::styled("  Esc: 取消", Style::default().fg(Color::DarkGray)),
         ])]);
