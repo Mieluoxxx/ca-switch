@@ -4,7 +4,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Tabs, Wrap},
+    widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Tabs, Wrap},
     Frame,
 };
 
@@ -186,10 +186,10 @@ fn render_providers_tab(frame: &mut Frame, app: &mut App, theme: &Theme, area: R
         .split(area);
 
     // 左侧: Provider 列表
-    let provider_border = if app.provider_tab_focus == 0 {
-        theme.active_border_style()
+    let provider_border_type = if app.provider_tab_focus == 0 {
+        theme.active_border_type()
     } else {
-        theme.border_style()
+        BorderType::Plain
     };
 
     let provider_items: Vec<ListItem> = app
@@ -207,7 +207,12 @@ fn render_providers_tab(frame: &mut Frame, app: &mut App, theme: &Theme, area: R
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .border_style(provider_border)
+                .border_style(if app.provider_tab_focus == 0 {
+                    theme.active_border_style()
+                } else {
+                    theme.border_style()
+                })
+                .border_type(provider_border_type)
                 .title(format!(" Providers ({}) ", app.get_provider_count())),
         )
         .highlight_style(if app.provider_tab_focus == 0 {
@@ -220,10 +225,10 @@ fn render_providers_tab(frame: &mut Frame, app: &mut App, theme: &Theme, area: R
     frame.render_stateful_widget(provider_list, chunks[0], &mut app.provider_list_state);
 
     // 中间: Model 列表
-    let model_border = if app.provider_tab_focus == 1 {
-        theme.active_border_style()
+    let model_border_type = if app.provider_tab_focus == 1 {
+        theme.active_border_type()
     } else {
-        theme.border_style()
+        BorderType::Plain
     };
 
     let model_title = if app.get_selected_provider().is_some() {
@@ -242,15 +247,18 @@ fn render_providers_tab(frame: &mut Frame, app: &mut App, theme: &Theme, area: R
             .split(chunks[1]);
 
         // 渲染搜索框
-        let search_border = if app.search_active {
-            theme.active_border_style()
-        } else {
-            theme.border_style()
-        };
-
         let search_block = Block::default()
             .borders(Borders::ALL)
-            .border_style(search_border)
+            .border_style(if app.search_active {
+                theme.active_border_style()
+            } else {
+                theme.border_style()
+            })
+            .border_type(if app.search_active {
+                theme.active_border_type()
+            } else {
+                BorderType::Plain
+            })
             .title(Span::styled(" / 搜索 ", theme.title_style()));
 
         let search_inner = search_block.inner(model_chunks[0]);
@@ -279,7 +287,12 @@ fn render_providers_tab(frame: &mut Frame, app: &mut App, theme: &Theme, area: R
 
     let model_block = Block::default()
         .borders(Borders::ALL)
-        .border_style(model_border)
+        .border_style(if app.provider_tab_focus == 1 {
+            theme.active_border_style()
+        } else {
+            theme.border_style()
+        })
+        .border_type(model_border_type)
         .title(model_title);
 
     let model_inner = model_block.inner(model_area);
@@ -375,6 +388,7 @@ fn render_providers_multi_select_mode(frame: &mut Frame, app: &mut App, theme: &
             Block::default()
                 .borders(Borders::ALL)
                 .border_style(theme.active_border_style())
+                .border_type(theme.active_border_type())
                 .title(format!(
                     " 多选 ({}/{}) ",
                     app.get_selected_count(),
@@ -590,6 +604,7 @@ fn render_mcp_tab(frame: &mut Frame, app: &mut App, theme: &Theme, area: Rect) {
             Block::default()
                 .borders(Borders::ALL)
                 .border_style(theme.active_border_style())
+                .border_type(theme.active_border_type())
                 .title(format!(" MCP 服务器 ({}) ", app.mcp_servers.len())),
         )
         .highlight_style(theme.highlight_style())
@@ -658,6 +673,7 @@ fn render_mcp_multi_sync_mode(frame: &mut Frame, app: &mut App, theme: &Theme, a
             Block::default()
                 .borders(Borders::ALL)
                 .border_style(theme.active_border_style())
+                .border_type(theme.active_border_type())
                 .title(format!(
                     " 多选同步 ({}/{}) ",
                     app.get_selected_mcp_count(),

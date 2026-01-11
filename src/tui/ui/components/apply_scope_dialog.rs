@@ -99,9 +99,8 @@ impl ApplyScopeDialog {
         self.provider_name = provider_name.to_string();
         self.provider_names = vec![provider_name.to_string()];
         self.visible = true;
-        self.apply_to_global = true;
-        self.apply_to_project = false;
         self.selected_option = 0;
+        self.update_state_from_option();
     }
 
     /// 显示对话框（多个Provider）
@@ -115,9 +114,8 @@ impl ApplyScopeDialog {
             self.provider_name = format!("{} 个 Provider", provider_names.len());
         }
         self.visible = true;
-        self.apply_to_global = true;
-        self.apply_to_project = false;
         self.selected_option = 0;
+        self.update_state_from_option();
     }
 
     /// 显示清空 MCP 配置对话框（空选择时使用）
@@ -126,9 +124,8 @@ impl ApplyScopeDialog {
         self.title = "清空 MCP 配置".to_string();
         self.provider_name = "将清空目标配置中的所有 MCP 服务器".to_string();
         self.visible = true;
-        self.apply_to_global = true;
-        self.apply_to_project = false;
         self.selected_option = 0;
+        self.update_state_from_option();
     }
 
     /// 隐藏对话框
