@@ -11,9 +11,9 @@ use std::path::PathBuf;
 
 /// OpenCode 配置管理器
 pub struct OpenCodeConfigManager {
-    opencode_config_file: PathBuf,  // ~/.opcd/opencode.json
-    opencode_dir: PathBuf,          // ~/.opencode
-    opencode_json: PathBuf,         // ~/.opencode/opencode.json
+    opencode_config_file: PathBuf, // ~/.opcd/opencode.json
+    opencode_dir: PathBuf,         // ~/.opencode
+    opencode_json: PathBuf,        // ~/.opencode/opencode.json
 }
 
 impl OpenCodeConfigManager {
@@ -21,8 +21,7 @@ impl OpenCodeConfigManager {
     pub fn new(config_dir: PathBuf) -> Result<Self, String> {
         // 确保 ~/.opcd 目录存在
         if !config_dir.exists() {
-            fs::create_dir_all(&config_dir)
-                .map_err(|e| format!("创建配置目录失败: {}", e))?;
+            fs::create_dir_all(&config_dir).map_err(|e| format!("创建配置目录失败: {}", e))?;
         }
 
         let opencode_config_file = config_dir.join("opencode.json");
@@ -54,8 +53,7 @@ impl OpenCodeConfigManager {
         let content = fs::read_to_string(&self.opencode_config_file)
             .map_err(|e| format!("读取 opencode.json 失败: {}", e))?;
 
-        serde_json::from_str(&content)
-            .map_err(|e| format!("解析 opencode.json 失败: {}", e))
+        serde_json::from_str(&content).map_err(|e| format!("解析 opencode.json 失败: {}", e))
     }
 
     /// 写入 opencode.json 配置
@@ -99,7 +97,8 @@ impl OpenCodeConfigManager {
             return Err(format!("Provider '{}' 已存在", provider_name));
         }
 
-        let provider = OpenCodeProvider::new(provider_name.clone(), base_url, api_key, npm, description);
+        let provider =
+            OpenCodeProvider::new(provider_name.clone(), base_url, api_key, npm, description);
         config.add_provider(provider_name, provider);
 
         self.write_config(&config)
@@ -154,7 +153,10 @@ impl OpenCodeConfigManager {
     // ========================================================================
 
     /// 获取模型
-    pub fn get_models(&self, provider_name: &str) -> Result<HashMap<String, OpenCodeModelInfo>, String> {
+    pub fn get_models(
+        &self,
+        provider_name: &str,
+    ) -> Result<HashMap<String, OpenCodeModelInfo>, String> {
         let config = self.read_config()?;
         let provider = config
             .get_provider(provider_name)
@@ -257,7 +259,10 @@ impl OpenCodeConfigManager {
     }
 
     /// 同步多个Provider配置到 OpenCode 官方配置文件
-    pub fn sync_multiple_providers_to_opencode(&self, provider_names: &[String]) -> Result<(), String> {
+    pub fn sync_multiple_providers_to_opencode(
+        &self,
+        provider_names: &[String],
+    ) -> Result<(), String> {
         // 确保 ~/.opencode 目录存在
         if !self.opencode_dir.exists() {
             fs::create_dir_all(&self.opencode_dir)
@@ -305,8 +310,8 @@ impl OpenCodeConfigManager {
     #[allow(dead_code)]
     pub fn sync_to_project(&self, active_config: &OpenCodeActiveConfig) -> Result<(), String> {
         // 获取当前工作目录
-        let current_dir = std::env::current_dir()
-            .map_err(|e| format!("获取当前目录失败: {}", e))?;
+        let current_dir =
+            std::env::current_dir().map_err(|e| format!("获取当前目录失败: {}", e))?;
 
         let project_opencode_dir = current_dir.join(".opencode");
         let project_opencode_json = project_opencode_dir.join("opencode.json");
@@ -353,10 +358,13 @@ impl OpenCodeConfigManager {
     }
 
     /// 同步多个Provider配置到项目级 .opencode/opencode.json
-    pub fn sync_multiple_providers_to_project(&self, provider_names: &[String]) -> Result<(), String> {
+    pub fn sync_multiple_providers_to_project(
+        &self,
+        provider_names: &[String],
+    ) -> Result<(), String> {
         // 获取当前工作目录
-        let current_dir = std::env::current_dir()
-            .map_err(|e| format!("获取当前目录失败: {}", e))?;
+        let current_dir =
+            std::env::current_dir().map_err(|e| format!("获取当前目录失败: {}", e))?;
 
         let project_opencode_dir = current_dir.join(".opencode");
         let project_opencode_json = project_opencode_dir.join("opencode.json");

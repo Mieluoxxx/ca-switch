@@ -159,7 +159,8 @@ impl MultiSelectDialog {
             self.list_state.select(None);
         } else if let Some(i) = self.list_state.selected() {
             if i >= self.filtered_indices.len() {
-                self.list_state.select(Some(self.filtered_indices.len() - 1));
+                self.list_state
+                    .select(Some(self.filtered_indices.len() - 1));
             }
         } else {
             self.list_state.select(Some(0));
@@ -261,8 +262,7 @@ impl MultiSelectDialog {
         // 如果正在加载
         if self.loading {
             let loading_text = self.message.as_deref().unwrap_or("加载中...");
-            let text = Paragraph::new(format!("⏳ {}", loading_text))
-                .style(theme.muted_style());
+            let text = Paragraph::new(format!("⏳ {}", loading_text)).style(theme.muted_style());
             frame.render_widget(text, inner);
             return;
         }
@@ -270,8 +270,7 @@ impl MultiSelectDialog {
         // 如果有错误消息
         if let Some(ref msg) = self.message {
             if self.items.is_empty() {
-                let text = Paragraph::new(format!("❌ {}", msg))
-                    .style(theme.error_style());
+                let text = Paragraph::new(format!("❌ {}", msg)).style(theme.error_style());
                 frame.render_widget(text, inner);
                 return;
             }

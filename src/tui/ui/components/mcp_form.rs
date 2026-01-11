@@ -29,7 +29,7 @@ pub struct McpServerForm {
     pub edit_server_name: Option<String>,
 
     // JSON 内容编辑（包含名称作为 key）
-    pub json_content: Vec<String>,  // 每行一个字符串
+    pub json_content: Vec<String>, // 每行一个字符串
     pub json_cursor_row: usize,
     pub json_cursor_col: usize,
 
@@ -37,9 +37,9 @@ pub struct McpServerForm {
     pub error_message: Option<String>,
 
     // 内容修改追踪
-    pub has_changes: bool,           // 是否有未保存的修改
-    pub confirm_close: bool,         // 是否显示关闭确认
-    original_content: Vec<String>,   // 原始内容（用于比较）
+    pub has_changes: bool,         // 是否有未保存的修改
+    pub confirm_close: bool,       // 是否显示关闭确认
+    original_content: Vec<String>, // 原始内容（用于比较）
 }
 
 impl Default for McpServerForm {
@@ -48,6 +48,7 @@ impl Default for McpServerForm {
     }
 }
 
+#[allow(dead_code)]
 impl McpServerForm {
     pub fn new() -> Self {
         let default_content = Self::default_json_template();
@@ -151,10 +152,7 @@ impl McpServerForm {
 
     /// 将 McpServer 转换为 JSON 行（包含名称作为 key）
     fn server_to_json_lines(&self, name: &str, server: &McpServer) -> Vec<String> {
-        let mut lines = vec![
-            "{".to_string(),
-            format!("  \"{}\": {{", name),
-        ];
+        let mut lines = vec!["{".to_string(), format!("  \"{}\": {{", name)];
 
         match server.server_type {
             McpServerType::Local => {
@@ -163,7 +161,8 @@ impl McpServerForm {
                     if !cmd.is_empty() {
                         lines.push(format!("    \"command\": \"{}\",", cmd[0]));
                         if cmd.len() > 1 {
-                            let args: Vec<String> = cmd[1..].iter().map(|a| format!("\"{}\"", a)).collect();
+                            let args: Vec<String> =
+                                cmd[1..].iter().map(|a| format!("\"{}\"", a)).collect();
                             lines.push(format!("    \"args\": [{}],", args.join(", ")));
                         } else {
                             lines.push("    \"args\": [],".to_string());
@@ -179,7 +178,7 @@ impl McpServerForm {
                     let env_items: Vec<(&String, &String)> = server.environment.iter().collect();
                     for (i, (k, v)) in env_items.iter().enumerate() {
                         let comma = if i < env_items.len() - 1 { "," } else { "" };
-                        lines.push(format!("      \"{}\": \"{}\"{}",k, v, comma));
+                        lines.push(format!("      \"{}\": \"{}\"{}", k, v, comma));
                     }
                     lines.push("    }".to_string());
                 }
@@ -198,7 +197,7 @@ impl McpServerForm {
                     let header_items: Vec<(&String, &String)> = server.headers.iter().collect();
                     for (i, (k, v)) in header_items.iter().enumerate() {
                         let comma = if i < header_items.len() - 1 { "," } else { "" };
-                        lines.push(format!("      \"{}\": \"{}\"{}",k, v, comma));
+                        lines.push(format!("      \"{}\": \"{}\"{}", k, v, comma));
                     }
                     lines.push("    },".to_string());
                 }
@@ -428,18 +427,21 @@ impl McpServerForm {
     /// 解析原始 JSON，返回 (名称, 配置JSON字符串)
     pub fn parse_raw_json(&self) -> Result<(String, String), String> {
         let json_str = self.json_content.join("\n");
-        let json: serde_json::Value = serde_json::from_str(&json_str)
-            .map_err(|e| format!("JSON 解析错误: {}", e))?;
+        let json: serde_json::Value =
+            serde_json::from_str(&json_str).map_err(|e| format!("JSON 解析错误: {}", e))?;
 
-        let obj = json.as_object()
+        let obj = json
+            .as_object()
             .ok_or_else(|| "JSON 必须是对象格式".to_string())?;
 
-        let (name, config) = obj.iter().next()
+        let (name, config) = obj
+            .iter()
+            .next()
             .ok_or_else(|| "JSON 对象不能为空".to_string())?;
 
         // 将配置部分格式化为 JSON 字符串
-        let config_str = serde_json::to_string_pretty(config)
-            .map_err(|e| format!("序列化配置失败: {}", e))?;
+        let config_str =
+            serde_json::to_string_pretty(config).map_err(|e| format!("序列化配置失败: {}", e))?;
 
         Ok((name.clone(), config_str))
     }
@@ -466,9 +468,8 @@ impl McpServerForm {
             if let Some(obj) = json.as_object() {
                 if let Some((_name, config)) = obj.iter().next() {
                     // 使用统一的 McpServer::from_json 方法
-                    return McpServer::from_json(config).unwrap_or_else(|_| {
-                        McpServer::new_local(vec![], HashMap::new())
-                    });
+                    return McpServer::from_json(config)
+                        .unwrap_or_else(|_| McpServer::new_local(vec![], HashMap::new()));
                 }
             }
         }
@@ -512,8 +513,8 @@ impl McpServerForm {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Min(10),    // JSON 编辑器
-                Constraint::Length(2),  // 提示/错误信息
+                Constraint::Min(10),   // JSON 编辑器
+                Constraint::Length(2), // 提示/错误信息
             ])
             .split(inner);
 
@@ -525,14 +526,18 @@ impl McpServerForm {
             .border_style(theme.active_border_style())
             .title(Span::styled(
                 json_title,
-                Style::default().fg(theme.primary).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(theme.primary)
+                    .add_modifier(Modifier::BOLD),
             ));
 
         let json_inner = json_block.inner(chunks[0]);
         frame.render_widget(json_block, chunks[0]);
 
         // 渲染 JSON 内容（带行号）
-        let json_lines: Vec<Line> = self.json_content.iter()
+        let json_lines: Vec<Line> = self
+            .json_content
+            .iter()
             .enumerate()
             .map(|(i, line)| {
                 let line_num = format!("{:2} ", i + 1);
@@ -591,21 +596,42 @@ impl McpServerForm {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(theme.warning))
-            .title(Span::styled(" ⚠ 确认关闭 ", Style::default().fg(theme.warning).add_modifier(Modifier::BOLD)));
+            .title(Span::styled(
+                " ⚠ 确认关闭 ",
+                Style::default()
+                    .fg(theme.warning)
+                    .add_modifier(Modifier::BOLD),
+            ));
 
         let inner = block.inner(popup_area);
         frame.render_widget(block, popup_area);
 
         let text = vec![
             Line::from(""),
-            Line::from(Span::styled("有未保存的修改，确定要放弃吗？", Style::default().fg(theme.fg))),
+            Line::from(Span::styled(
+                "有未保存的修改，确定要放弃吗？",
+                Style::default().fg(theme.fg),
+            )),
             Line::from(""),
             Line::from(vec![
-                Span::styled("[Y]", Style::default().fg(theme.error).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "[Y]",
+                    Style::default()
+                        .fg(theme.error)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::raw(" 放弃修改  "),
-                Span::styled("[N]", Style::default().fg(theme.success).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "[N]",
+                    Style::default()
+                        .fg(theme.success)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::raw(" 继续编辑  "),
-                Span::styled("[Ctrl+S]", Style::default().fg(theme.info).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "[Ctrl+S]",
+                    Style::default().fg(theme.info).add_modifier(Modifier::BOLD),
+                ),
                 Span::raw(" 保存"),
             ]),
         ];

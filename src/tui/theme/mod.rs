@@ -85,6 +85,22 @@ impl Theme {
     pub fn muted_style(&self) -> Style {
         Style::default().fg(self.muted)
     }
+
+    /// Provider 列表高亮样式（焦点在 Provider 时显示）
+    pub fn provider_highlight_style(&self) -> Style {
+        Style::default()
+            .fg(self.bg)
+            .bg(self.highlight)
+            .add_modifier(Modifier::BOLD)
+    }
+
+    /// Model 列表高亮样式（焦点在 Model 时显示）
+    pub fn model_highlight_style(&self) -> Style {
+        Style::default()
+            .fg(self.bg)
+            .bg(self.highlight)
+            .add_modifier(Modifier::BOLD)
+    }
 }
 
 impl Default for Theme {

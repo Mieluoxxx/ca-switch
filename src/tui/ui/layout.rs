@@ -120,8 +120,7 @@ fn render_header(frame: &mut Frame, theme: &Theme, area: Rect) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let text = Paragraph::new("Coding Agent 配置管理工具")
-        .style(Style::default().fg(theme.muted));
+    let text = Paragraph::new("Coding Agent 配置管理工具").style(Style::default().fg(theme.muted));
     frame.render_widget(text, inner);
 }
 
@@ -211,7 +210,11 @@ fn render_providers_tab(frame: &mut Frame, app: &mut App, theme: &Theme, area: R
                 .border_style(provider_border)
                 .title(format!(" Providers ({}) ", app.get_provider_count())),
         )
-        .highlight_style(theme.highlight_style())
+        .highlight_style(if app.provider_tab_focus == 0 {
+            theme.provider_highlight_style()
+        } else {
+            Style::default()
+        })
         .highlight_symbol("▶ ");
 
     frame.render_stateful_widget(provider_list, chunks[0], &mut app.provider_list_state);
@@ -297,7 +300,11 @@ fn render_providers_tab(frame: &mut Frame, app: &mut App, theme: &Theme, area: R
                 .collect();
 
             let model_list = List::new(model_items)
-                .highlight_style(theme.highlight_style())
+                .highlight_style(if app.provider_tab_focus == 1 {
+                    theme.model_highlight_style()
+                } else {
+                    Style::default()
+                })
                 .highlight_symbol("▶ ");
 
             frame.render_stateful_widget(model_list, model_inner, &mut app.model_list_state);
@@ -340,7 +347,12 @@ fn render_providers_multi_select_mode(frame: &mut Frame, app: &mut App, theme: &
         .map(|name| {
             let is_selected = app.is_provider_selected(name);
             let (prefix, prefix_style) = if is_selected {
-                ("☑", Style::default().fg(theme.success).add_modifier(Modifier::BOLD))
+                (
+                    "☑",
+                    Style::default()
+                        .fg(theme.success)
+                        .add_modifier(Modifier::BOLD),
+                )
             } else {
                 ("☐", Style::default().fg(theme.muted))
             };
@@ -386,7 +398,11 @@ fn render_providers_multi_select_mode(frame: &mut Frame, app: &mut App, theme: &
     if let Some(provider_name) = app.get_multi_apply_current() {
         if let Ok(Some(provider)) = app.config_manager.opencode().get_provider(provider_name) {
             let is_selected = app.is_provider_selected(provider_name);
-            let status = if is_selected { "✓ 已选择" } else { "○ 未选择" };
+            let status = if is_selected {
+                "✓ 已选择"
+            } else {
+                "○ 未选择"
+            };
 
             let details = vec![
                 Line::from(vec![
@@ -477,13 +493,19 @@ fn render_detail_panel(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) 
                         if let Some(ctx) = limit.context {
                             lines.push(Line::from(vec![
                                 Span::styled("  Context: ", theme.muted_style()),
-                                Span::styled(format_token_count(ctx), Style::default().fg(theme.fg)),
+                                Span::styled(
+                                    format_token_count(ctx),
+                                    Style::default().fg(theme.fg),
+                                ),
                             ]));
                         }
                         if let Some(out) = limit.output {
                             lines.push(Line::from(vec![
                                 Span::styled("  Output:  ", theme.muted_style()),
-                                Span::styled(format_token_count(out), Style::default().fg(theme.fg)),
+                                Span::styled(
+                                    format_token_count(out),
+                                    Style::default().fg(theme.fg),
+                                ),
                             ]));
                         }
                     }
@@ -535,16 +557,17 @@ fn render_mcp_tab(frame: &mut Frame, app: &mut App, theme: &Theme, area: Rect) {
         .iter()
         .map(|name| {
             // 获取服务器信息
-            let (icon, enabled) = if let Ok(Some(server)) = app.config_manager.mcp().get_server(name) {
-                let icon = match server.server_type {
-                    crate::config::models::McpServerType::Local => "📦",
-                    crate::config::models::McpServerType::Remote => "🌐",
+            let (icon, enabled) =
+                if let Ok(Some(server)) = app.config_manager.mcp().get_server(name) {
+                    let icon = match server.server_type {
+                        crate::config::models::McpServerType::Local => "📦",
+                        crate::config::models::McpServerType::Remote => "🌐",
+                    };
+                    let enabled = server.enabled;
+                    (icon, enabled)
+                } else {
+                    ("📦", true)
                 };
-                let enabled = server.enabled;
-                (icon, enabled)
-            } else {
-                ("📦", true)
-            };
 
             let status = if enabled { "✓" } else { "✗" };
             let status_style = if enabled {
@@ -595,7 +618,12 @@ fn render_mcp_multi_sync_mode(frame: &mut Frame, app: &mut App, theme: &Theme, a
         .map(|name| {
             let is_selected = app.is_mcp_server_selected(name);
             let (prefix, prefix_style) = if is_selected {
-                ("☑", Style::default().fg(theme.success).add_modifier(Modifier::BOLD))
+                (
+                    "☑",
+                    Style::default()
+                        .fg(theme.success)
+                        .add_modifier(Modifier::BOLD),
+                )
             } else {
                 ("☐", Style::default().fg(theme.muted))
             };
@@ -653,7 +681,11 @@ fn render_mcp_multi_sync_mode(frame: &mut Frame, app: &mut App, theme: &Theme, a
     if let Some(server_name) = app.get_mcp_multi_current() {
         if let Ok(Some(server)) = app.config_manager.mcp().get_server(server_name) {
             let is_selected = app.is_mcp_server_selected(server_name);
-            let status = if is_selected { "✓ 已选择" } else { "○ 未选择" };
+            let status = if is_selected {
+                "✓ 已选择"
+            } else {
+                "○ 未选择"
+            };
 
             let type_str = match server.server_type {
                 crate::config::models::McpServerType::Local => "本地",
@@ -707,7 +739,11 @@ fn render_mcp_detail_panel(frame: &mut Frame, app: &App, theme: &Theme, area: Re
                 crate::config::models::McpServerType::Remote => "远程 🌐",
             };
 
-            let status_str = if server.enabled { "✓ 已启用" } else { "✗ 已禁用" };
+            let status_str = if server.enabled {
+                "✓ 已启用"
+            } else {
+                "✗ 已禁用"
+            };
             let status_style = if server.enabled {
                 theme.success_style()
             } else {
@@ -948,10 +984,7 @@ fn render_status_tab(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
         ]),
         Line::from(vec![
             Span::styled("  Model 总数:    ", theme.muted_style()),
-            Span::styled(
-                total_models.to_string(),
-                Style::default().fg(theme.info),
-            ),
+            Span::styled(total_models.to_string(), Style::default().fg(theme.info)),
         ]),
         Line::from(""),
         Line::from(Span::styled(
@@ -988,7 +1021,10 @@ fn render_status_tab(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
     let log_block = Block::default()
         .borders(Borders::ALL)
         .border_style(theme.border_style())
-        .title(Span::styled(format!(" 📝 操作日志 ({}) ", app.operation_logs.len()), theme.title_style()));
+        .title(Span::styled(
+            format!(" 📝 操作日志 ({}) ", app.operation_logs.len()),
+            theme.title_style(),
+        ));
 
     let log_inner = log_block.inner(chunks[1]);
     frame.render_widget(log_block, chunks[1]);
@@ -1061,17 +1097,29 @@ fn render_footer(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
     // 解析并高亮快捷键
     let shortcut_spans = parse_shortcuts_with_highlight(shortcuts, theme);
     let global_spans = vec![
-        Span::styled("[Tab]切换", Style::default().fg(theme.primary).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "[Tab]切换",
+            Style::default()
+                .fg(theme.primary)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled(" ", theme.muted_style()),
-        Span::styled("[?]帮助", Style::default().fg(theme.primary).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "[?]帮助",
+            Style::default()
+                .fg(theme.primary)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled(" ", theme.muted_style()),
-        Span::styled("[q]退出", Style::default().fg(theme.error).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "[q]退出",
+            Style::default()
+                .fg(theme.error)
+                .add_modifier(Modifier::BOLD),
+        ),
     ];
 
-    let text = Paragraph::new(vec![
-        Line::from(shortcut_spans),
-        Line::from(global_spans),
-    ]);
+    let text = Paragraph::new(vec![Line::from(shortcut_spans), Line::from(global_spans)]);
     frame.render_widget(text, inner);
 }
 
@@ -1100,7 +1148,9 @@ fn parse_shortcuts_with_highlight<'a>(text: &str, theme: &Theme) -> Vec<Span<'a>
                 let shortcut_with_desc: String = chars[current_pos..desc_end].iter().collect();
                 spans.push(Span::styled(
                     shortcut_with_desc,
-                    Style::default().fg(theme.primary).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(theme.primary)
+                        .add_modifier(Modifier::BOLD),
                 ));
                 current_pos = desc_end;
             } else {
@@ -1143,7 +1193,10 @@ fn render_help_popup(frame: &mut Frame, theme: &Theme, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(theme.active_border_style())
-        .title(Span::styled(" ❓ 帮助 - 按任意键关闭 ", theme.title_style()));
+        .title(Span::styled(
+            " ❓ 帮助 - 按任意键关闭 ",
+            theme.title_style(),
+        ));
 
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
@@ -1217,9 +1270,7 @@ fn render_toast(
         MessageType::Info => ("ℹ", theme.info_style()),
     };
 
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(style);
+    let block = Block::default().borders(Borders::ALL).border_style(style);
 
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);

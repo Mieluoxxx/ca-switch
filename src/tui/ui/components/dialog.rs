@@ -78,22 +78,21 @@ impl ConfirmDialog {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(theme.active_border_style())
-            .title(Span::styled(format!(" {} ", self.title), theme.title_style()));
+            .title(Span::styled(
+                format!(" {} ", self.title),
+                theme.title_style(),
+            ));
 
         let inner = block.inner(popup_area);
         frame.render_widget(block, popup_area);
 
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Min(3),
-                Constraint::Length(3),
-            ])
+            .constraints([Constraint::Min(3), Constraint::Length(3)])
             .split(inner);
 
         // 消息
-        let message = Paragraph::new(self.message.clone())
-            .style(Style::default().fg(theme.fg));
+        let message = Paragraph::new(self.message.clone()).style(Style::default().fg(theme.fg));
         frame.render_widget(message, chunks[0]);
 
         // 按钮

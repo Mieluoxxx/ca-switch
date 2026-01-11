@@ -17,13 +17,11 @@ async fn main() -> Result<()> {
         Some(Commands::Status) => {
             show_status()?;
         }
-        Some(Commands::Export { config_type }) => {
-            match config_type {
-                ExportType::OpenCode => {
-                    export_opencode_config()?;
-                }
+        Some(Commands::Export { config_type }) => match config_type {
+            ExportType::OpenCode => {
+                export_opencode_config()?;
             }
-        }
+        },
         None => {
             // 没有子命令时，启动 TUI 界面
             if let Err(e) = tui::run() {
@@ -38,8 +36,8 @@ async fn main() -> Result<()> {
 
 /// 显示状态
 fn show_status() -> Result<()> {
-    use console::style;
     use config::ConfigManager;
+    use console::style;
     use utils::show_info;
 
     println!("\n{}", style("📊 当前配置状态").cyan().bold());
@@ -50,10 +48,22 @@ fn show_status() -> Result<()> {
     println!("\n{}", style("🚀 OpenCode 配置:").white().bold());
     match config_manager.get_active_opencode_config()? {
         Some(config) => {
-            println!("  {} {}", style("Provider:").white(), style(&config.provider).cyan());
-            println!("  {} {}", style("Base URL:").white(), style(&config.base_url).dim());
+            println!(
+                "  {} {}",
+                style("Provider:").white(),
+                style(&config.provider).cyan()
+            );
+            println!(
+                "  {} {}",
+                style("Base URL:").white(),
+                style(&config.base_url).dim()
+            );
             let model_list: Vec<&str> = config.models.keys().map(|s| s.as_str()).collect();
-            println!("  {} {}", style("可用模型:").white(), style(model_list.join(", ")).yellow());
+            println!(
+                "  {} {}",
+                style("可用模型:").white(),
+                style(model_list.join(", ")).yellow()
+            );
         }
         None => {
             show_info("未配置 OpenCode");
@@ -85,8 +95,7 @@ fn export_opencode_config() -> Result<()> {
     }
 
     // 获取目标文件路径 (当前目录/.opencode/opencode.json)
-    let current_dir = std::env::current_dir()
-        .map_err(|e| format!("无法获取当前目录: {}", e))?;
+    let current_dir = std::env::current_dir().map_err(|e| format!("无法获取当前目录: {}", e))?;
     let target_dir = current_dir.join(".opencode");
     let target_path = target_dir.join("opencode.json");
 
@@ -105,12 +114,10 @@ fn export_opencode_config() -> Result<()> {
     }
 
     // 创建目标目录
-    std::fs::create_dir_all(&target_dir)
-        .map_err(|e| format!("创建目标目录失败: {}", e))?;
+    std::fs::create_dir_all(&target_dir).map_err(|e| format!("创建目标目录失败: {}", e))?;
 
     // 复制文件
-    std::fs::copy(&source_path, &target_path)
-        .map_err(|e| format!("复制文件失败: {}", e))?;
+    std::fs::copy(&source_path, &target_path).map_err(|e| format!("复制文件失败: {}", e))?;
 
     show_success("✨ 配置已成功导出到当前目录！");
     println!();

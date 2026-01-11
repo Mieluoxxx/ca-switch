@@ -158,16 +158,16 @@ impl InputForm {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(theme.active_border_style())
-            .title(Span::styled(format!(" {} ", self.title), theme.title_style()));
+            .title(Span::styled(
+                format!(" {} ", self.title),
+                theme.title_style(),
+            ));
 
         let inner = block.inner(popup_area);
         frame.render_widget(block, popup_area);
 
-        let mut constraints: Vec<Constraint> = self
-            .fields
-            .iter()
-            .map(|_| Constraint::Length(3))
-            .collect();
+        let mut constraints: Vec<Constraint> =
+            self.fields.iter().map(|_| Constraint::Length(3)).collect();
         constraints.push(Constraint::Length(2)); // 按钮行
         constraints.push(Constraint::Min(0)); // 剩余空间
 
