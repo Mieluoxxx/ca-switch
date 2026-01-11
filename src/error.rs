@@ -15,6 +15,9 @@ pub enum CliError {
     #[error("交互式输入错误: {0}")]
     Dialoguer(#[from] dialoguer::Error),
 
+    #[error("配置错误: {0}")]
+    Config(#[from] crate::config::ConfigError),
+
     #[error("{0}")]
     #[allow(dead_code)]
     Custom(String),

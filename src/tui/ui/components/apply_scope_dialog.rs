@@ -54,7 +54,11 @@ fn truncate_path(path: &str, max_len: usize) -> String {
         result
     } else {
         // 还是太长，只保留开头和...
-        format!("{}/.../{}...", start, &end[..((max_len - start.len() - 7).max(3))])
+        format!(
+            "{}/.../{}...",
+            start,
+            &end[..((max_len - start.len() - 7).max(3))]
+        )
     }
 }
 
@@ -136,6 +140,15 @@ impl ApplyScopeDialog {
     /// 切换选项
     pub fn toggle_option(&mut self) {
         self.selected_option = (self.selected_option + 1) % 3;
+        self.update_state_from_option();
+    }
+
+    /// 根据当前 selected_option 的值更新 apply_to_global 和 apply_to_project 状态
+    ///
+    /// - selected_option = 0: 仅全局配置 (apply_to_global=true, apply_to_project=false)
+    /// - selected_option = 1: 仅项目配置 (apply_to_global=false, apply_to_project=true)
+    /// - selected_option = 2: 两者都应用 (apply_to_global=true, apply_to_project=true)
+    pub fn update_state_from_option(&mut self) {
         match self.selected_option {
             0 => {
                 self.apply_to_global = true;
@@ -194,13 +207,13 @@ impl ApplyScopeDialog {
         let content_layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1),  // Provider 名称标签
-                Constraint::Length(1),  // Provider 名称值
-                Constraint::Length(1),  // 空行
-                Constraint::Length(3),  // 选项区域（三个选项）
-                Constraint::Length(1),  // 空行
-                Constraint::Length(3),  // 操作提示
-                Constraint::Length(2),  // 状态行
+                Constraint::Length(1), // Provider 名称标签
+                Constraint::Length(1), // Provider 名称值
+                Constraint::Length(1), // 空行
+                Constraint::Length(3), // 选项区域（三个选项）
+                Constraint::Length(1), // 空行
+                Constraint::Length(3), // 操作提示
+                Constraint::Length(2), // 状态行
             ])
             .split(inner_area);
 
@@ -208,8 +221,11 @@ impl ApplyScopeDialog {
         let is_clear_mode = self.title.contains("清空");
         if is_clear_mode {
             // 清空模式：显示警告提示
-            let warning = Paragraph::new("⚠ 注意:")
-                .style(Style::default().fg(theme.warning).add_modifier(Modifier::BOLD));
+            let warning = Paragraph::new("⚠ 注意:").style(
+                Style::default()
+                    .fg(theme.warning)
+                    .add_modifier(Modifier::BOLD),
+            );
             frame.render_widget(warning, content_layout[0]);
 
             let name_value = Paragraph::new(self.provider_name.clone())
@@ -217,13 +233,19 @@ impl ApplyScopeDialog {
             frame.render_widget(name_value, content_layout[1]);
         } else {
             // 正常模式：显示 Provider/MCP 服务器信息
-            let label = if self.title.contains("MCP") { "MCP 服务器:" } else { "Provider:" };
-            let name_label = Paragraph::new(label)
-                .style(theme.muted_style());
+            let label = if self.title.contains("MCP") {
+                "MCP 服务器:"
+            } else {
+                "Provider:"
+            };
+            let name_label = Paragraph::new(label).style(theme.muted_style());
             frame.render_widget(name_label, content_layout[0]);
 
-            let name_value = Paragraph::new(self.provider_name.clone())
-                .style(Style::default().fg(theme.primary).add_modifier(Modifier::BOLD));
+            let name_value = Paragraph::new(self.provider_name.clone()).style(
+                Style::default()
+                    .fg(theme.primary)
+                    .add_modifier(Modifier::BOLD),
+            );
             frame.render_widget(name_value, content_layout[1]);
         }
 
@@ -233,7 +255,9 @@ impl ApplyScopeDialog {
 
         // 4-6. 选项
         let option_style = Style::default().fg(Color::White);
-        let selected_style = Style::default().fg(theme.primary).add_modifier(Modifier::BOLD);
+        let selected_style = Style::default()
+            .fg(theme.primary)
+            .add_modifier(Modifier::BOLD);
 
         let project_path = get_project_path_display();
         // 截断过长的路径（对话框宽度54，减去前缀和后缀，保留约30个字符）
@@ -245,9 +269,15 @@ impl ApplyScopeDialog {
             Span::styled("  全局配置 ~/.opencode/", option_style)
         };
         let opt2 = if self.selected_option == 1 {
-            Span::styled(format!("▶ 当前项目 {}/.opencode/", truncated_path), selected_style)
+            Span::styled(
+                format!("▶ 当前项目 {}/.opencode/", truncated_path),
+                selected_style,
+            )
         } else {
-            Span::styled(format!("  当前项目 {}/.opencode/", truncated_path), option_style)
+            Span::styled(
+                format!("  当前项目 {}/.opencode/", truncated_path),
+                option_style,
+            )
         };
         let opt3 = if self.selected_option == 2 {
             Span::styled("▶ 两者都应用", selected_style)
@@ -255,11 +285,7 @@ impl ApplyScopeDialog {
             Span::styled("  两者都应用", option_style)
         };
 
-        let options_text = Text::from(vec![
-            Line::from(opt1),
-            Line::from(opt2),
-            Line::from(opt3),
-        ]);
+        let options_text = Text::from(vec![Line::from(opt1), Line::from(opt2), Line::from(opt3)]);
         let options_widget = Paragraph::new(options_text).style(theme.muted_style());
         frame.render_widget(options_widget, content_layout[3]);
 
@@ -268,13 +294,11 @@ impl ApplyScopeDialog {
         frame.render_widget(spacer, content_layout[4]);
 
         // 5. 操作提示
-        let hint = Text::from(vec![
-            Line::from(vec![
-                Span::styled("←/→/Tab: 切换选项  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("Enter: 确认", Style::default().fg(Color::DarkGray)),
-                Span::styled("  Esc: 取消", Style::default().fg(Color::DarkGray)),
-            ]),
-        ]);
+        let hint = Text::from(vec![Line::from(vec![
+            Span::styled("↑/↓/j/k: 切换选项  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Enter: 确认", Style::default().fg(Color::DarkGray)),
+            Span::styled("  Esc: 取消", Style::default().fg(Color::DarkGray)),
+        ])]);
         let hint_widget = Paragraph::new(hint)
             .alignment(Alignment::Center)
             .style(theme.muted_style());
@@ -285,12 +309,16 @@ impl ApplyScopeDialog {
         let (status_text, status_style) = if is_clear_mode {
             (
                 format!("将清空: {} 的 MCP 配置", target),
-                Style::default().fg(theme.warning).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(theme.warning)
+                    .add_modifier(Modifier::BOLD),
             )
         } else {
             (
                 format!("将应用到: {}", target),
-                Style::default().fg(theme.success).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(theme.success)
+                    .add_modifier(Modifier::BOLD),
             )
         };
         let status = Paragraph::new(status_text)

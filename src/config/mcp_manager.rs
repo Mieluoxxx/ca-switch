@@ -2,6 +2,7 @@
 // 负责管理 ~/.opcd/mcp/ 目录下的多个 JSON 文件，并同步到 opencode.json
 
 use crate::config::models::{McpConfig, McpOAuthConfig, McpServer, McpServerType};
+use crate::config::ConfigError;
 use serde_json;
 use std::collections::HashMap;
 use std::fs;
@@ -10,24 +11,26 @@ use std::path::PathBuf;
 /// MCP 配置管理器
 /// 采用目录模式：~/.opcd/mcp/ 下每个服务器一个 JSON 文件
 pub struct McpConfigManager {
-    mcp_dir: PathBuf,           // ~/.opcd/mcp/
-    opencode_dir: PathBuf,      // ~/.opencode
-    opencode_json: PathBuf,     // ~/.opencode/opencode.json
+    mcp_dir: PathBuf,       // ~/.opcd/mcp/
+    opencode_dir: PathBuf,  // ~/.opencode
+    opencode_json: PathBuf, // ~/.opencode/opencode.json
 }
 
+#[allow(dead_code)]
 impl McpConfigManager {
     /// 创建新的 MCP 配置管理器
-    pub fn new(config_dir: PathBuf) -> Result<Self, String> {
+    pub fn new(config_dir: PathBuf) -> Result<Self, ConfigError> {
         let mcp_dir = config_dir.join("mcp");
 
         // 确保 mcp 目录存在
         if !mcp_dir.exists() {
-            fs::create_dir_all(&mcp_dir)
-                .map_err(|e| format!("创建 mcp 目录失败: {}", e))?;
+            fs::create_dir_all(&mcp_dir)?;
         }
 
         let opencode_dir = dirs::home_dir()
-            .ok_or("无法获取用户主目录")?
+            .ok_or_else(|| ConfigError::NotFound {
+                name: "用户主目录".to_string(),
+            })?
             .join(".opencode");
 
         let opencode_json = opencode_dir.join("opencode.json");
@@ -66,8 +69,8 @@ impl McpConfigManager {
         }
 
         // 遍历 mcp 目录下的所有 .json 文件
-        let entries = fs::read_dir(&self.mcp_dir)
-            .map_err(|e| format!("读取 mcp 目录失败: {}", e))?;
+        let entries =
+            fs::read_dir(&self.mcp_dir).map_err(|e| format!("读取 mcp 目录失败: {}", e))?;
 
         for entry in entries {
             let entry = entry.map_err(|e| format!("读取目录条目失败: {}", e))?;
@@ -97,8 +100,7 @@ impl McpConfigManager {
     /// 1. 用户原始格式：{ "command": "uvx", "args": [...] }
     /// 2. McpServer 结构体格式（向后兼容）
     fn read_server_file(&self, path: &PathBuf) -> Result<McpServer, String> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| format!("读取文件失败: {}", e))?;
+        let content = fs::read_to_string(path).map_err(|e| format!("读取文件失败: {}", e))?;
 
         // 首先尝试解析为 McpServer 结构体格式
         if let Ok(server) = serde_json::from_str::<McpServer>(&content) {
@@ -106,8 +108,8 @@ impl McpConfigManager {
         }
 
         // 尝试解析用户原始 JSON 格式，使用统一的 McpServer::from_json
-        let json: serde_json::Value = serde_json::from_str(&content)
-            .map_err(|e| format!("解析 JSON 失败: {}", e))?;
+        let json: serde_json::Value =
+            serde_json::from_str(&content).map_err(|e| format!("解析 JSON 失败: {}", e))?;
 
         McpServer::from_json(&json)
     }
@@ -115,19 +117,17 @@ impl McpConfigManager {
     /// 写入单个服务器配置文件
     fn write_server_file(&self, name: &str, server: &McpServer) -> Result<(), String> {
         let path = self.get_server_file(name);
-        let content = serde_json::to_string_pretty(server)
-            .map_err(|e| format!("序列化失败: {}", e))?;
+        let content =
+            serde_json::to_string_pretty(server).map_err(|e| format!("序列化失败: {}", e))?;
 
-        fs::write(&path, content)
-            .map_err(|e| format!("写入文件失败: {}", e))
+        fs::write(&path, content).map_err(|e| format!("写入文件失败: {}", e))
     }
 
     /// 删除服务器配置文件
     fn delete_server_file(&self, name: &str) -> Result<(), String> {
         let path = self.get_server_file(name);
         if path.exists() {
-            fs::remove_file(&path)
-                .map_err(|e| format!("删除文件失败: {}", e))?;
+            fs::remove_file(&path).map_err(|e| format!("删除文件失败: {}", e))?;
         }
         Ok(())
     }
@@ -221,8 +221,7 @@ impl McpConfigManager {
             }
         };
 
-        fs::write(&path, formatted)
-            .map_err(|e| format!("写入文件失败: {}", e))
+        fs::write(&path, formatted).map_err(|e| format!("写入文件失败: {}", e))
     }
 
     /// 删除服务器
@@ -247,13 +246,13 @@ impl McpConfigManager {
             return Err(format!("MCP 服务器 '{}' 已存在", new_name));
         }
 
-        fs::rename(&old_path, &new_path)
-            .map_err(|e| format!("重命名失败: {}", e))
+        fs::rename(&old_path, &new_path).map_err(|e| format!("重命名失败: {}", e))
     }
 
     /// 切换服务器启用状态
     pub fn toggle_server_enabled(&mut self, name: &str) -> Result<bool, String> {
-        let mut server = self.get_server(name)?
+        let mut server = self
+            .get_server(name)?
             .ok_or_else(|| format!("MCP 服务器 '{}' 不存在", name))?;
 
         server.enabled = !server.enabled;
@@ -281,8 +280,7 @@ impl McpConfigManager {
         let mut opencode_data: serde_json::Value = if self.opencode_json.exists() {
             let content = fs::read_to_string(&self.opencode_json)
                 .map_err(|e| format!("读取 opencode.json 失败: {}", e))?;
-            serde_json::from_str(&content)
-                .map_err(|e| format!("解析 opencode.json 失败: {}", e))?
+            serde_json::from_str(&content).map_err(|e| format!("解析 opencode.json 失败: {}", e))?
         } else {
             serde_json::json!({
                 "$schema": "https://opencode.ai/config.json",
@@ -311,8 +309,8 @@ impl McpConfigManager {
 
     /// 同步 MCP 配置到项目级 opencode.json
     pub fn sync_to_project(&self, server_names: Option<&[String]>) -> Result<(), String> {
-        let current_dir = std::env::current_dir()
-            .map_err(|e| format!("获取当前目录失败: {}", e))?;
+        let current_dir =
+            std::env::current_dir().map_err(|e| format!("获取当前目录失败: {}", e))?;
 
         let project_opencode_dir = current_dir.join(".opencode");
         let project_opencode_json = project_opencode_dir.join("opencode.json");
@@ -358,17 +356,16 @@ impl McpConfigManager {
         let mut mcp_map = serde_json::Map::new();
 
         let servers_to_sync: Vec<(String, McpServer)> = match server_names {
-            Some(names) => {
-                names.iter()
-                    .filter_map(|n| mcp_config.get_server(n).map(|s| (n.clone(), s.clone())))
-                    .collect()
-            }
-            None => {
-                mcp_config.servers.iter()
-                    .filter(|(_, s)| s.enabled)
-                    .map(|(n, s)| (n.clone(), s.clone()))
-                    .collect()
-            }
+            Some(names) => names
+                .iter()
+                .filter_map(|n| mcp_config.get_server(n).map(|s| (n.clone(), s.clone())))
+                .collect(),
+            None => mcp_config
+                .servers
+                .iter()
+                .filter(|(_, s)| s.enabled)
+                .map(|(n, s)| (n.clone(), s.clone()))
+                .collect(),
         };
 
         for (name, server) in servers_to_sync {
@@ -383,7 +380,10 @@ impl McpConfigManager {
     fn server_to_opencode_format(&self, server: &McpServer) -> Result<serde_json::Value, String> {
         let mut obj = serde_json::Map::new();
 
-        obj.insert("type".to_string(), serde_json::json!(server.server_type.to_string()));
+        obj.insert(
+            "type".to_string(),
+            serde_json::json!(server.server_type.to_string()),
+        );
         obj.insert("enabled".to_string(), serde_json::json!(server.enabled));
 
         if let Some(timeout) = server.timeout {
@@ -396,7 +396,10 @@ impl McpConfigManager {
                     obj.insert("command".to_string(), serde_json::json!(cmd));
                 }
                 if !server.environment.is_empty() {
-                    obj.insert("environment".to_string(), serde_json::json!(server.environment));
+                    obj.insert(
+                        "environment".to_string(),
+                        serde_json::json!(server.environment),
+                    );
                 }
             }
             McpServerType::Remote => {
@@ -413,7 +416,10 @@ impl McpConfigManager {
                             oauth_obj.insert("clientId".to_string(), serde_json::json!(client_id));
                         }
                         if let Some(ref client_secret) = oauth.client_secret {
-                            oauth_obj.insert("clientSecret".to_string(), serde_json::json!(client_secret));
+                            oauth_obj.insert(
+                                "clientSecret".to_string(),
+                                serde_json::json!(client_secret),
+                            );
                         }
                         if let Some(ref scope) = oauth.scope {
                             oauth_obj.insert("scope".to_string(), serde_json::json!(scope));

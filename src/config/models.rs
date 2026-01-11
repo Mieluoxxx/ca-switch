@@ -202,14 +202,17 @@ impl Default for OpenCodeConfig {
 
 impl OpenCodeProvider {
     /// 创建新的 Provider
-    pub fn new(name: String, base_url: String, api_key: String, npm: Option<String>, description: Option<String>) -> Self {
+    pub fn new(
+        name: String,
+        base_url: String,
+        api_key: String,
+        npm: Option<String>,
+        description: Option<String>,
+    ) -> Self {
         Self {
             npm,
             name,
-            options: OpenCodeProviderOptions {
-                base_url,
-                api_key,
-            },
+            options: OpenCodeProviderOptions { base_url, api_key },
             models: HashMap::new(),
             metadata: ProviderMetadata {
                 description,
@@ -264,9 +267,7 @@ impl OpenCodeActiveConfig {
     ) -> Result<Self, String> {
         let provider = config
             .get_provider(&reference.provider)
-            .ok_or_else(|| {
-                format!("Provider '{}' not found", reference.provider)
-            })?;
+            .ok_or_else(|| format!("Provider '{}' not found", reference.provider))?;
 
         Ok(Self {
             provider: reference.provider.clone(),
@@ -473,19 +474,9 @@ impl McpConfig {
         self.servers.get(name)
     }
 
-    /// 获取可变服务器
-    pub fn get_server_mut(&mut self, name: &str) -> Option<&mut McpServer> {
-        self.servers.get_mut(name)
-    }
-
     /// 添加服务器
     pub fn add_server(&mut self, name: String, server: McpServer) {
         self.servers.insert(name, server);
-    }
-
-    /// 删除服务器
-    pub fn remove_server(&mut self, name: &str) -> Option<McpServer> {
-        self.servers.remove(name)
     }
 
     /// 获取按名称排序的服务器列表
@@ -545,8 +536,14 @@ impl McpServer {
             }
         }
 
-        let timeout = json.get("timeout").and_then(|v| v.as_u64()).map(|v| v as u32);
-        let enabled = json.get("enabled").and_then(|v| v.as_bool()).unwrap_or(true);
+        let timeout = json
+            .get("timeout")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as u32);
+        let enabled = json
+            .get("enabled")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
 
         Ok(Self {
             server_type: McpServerType::Local,
@@ -563,7 +560,11 @@ impl McpServer {
 
     /// 解析远程服务器配置
     fn parse_remote_from_json(json: &serde_json::Value) -> Result<Self, String> {
-        let url = json.get("url").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let url = json
+            .get("url")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
 
         let mut headers = HashMap::new();
         if let Some(h) = json.get("headers").and_then(|v| v.as_object()) {
@@ -575,11 +576,24 @@ impl McpServer {
         }
 
         let oauth = if let Some(o) = json.get("oauth").and_then(|v| v.as_object()) {
-            let client_id = o.get("clientId").and_then(|v| v.as_str()).map(|s| s.to_string());
-            let client_secret = o.get("clientSecret").and_then(|v| v.as_str()).map(|s| s.to_string());
-            let scope = o.get("scope").and_then(|v| v.as_str()).map(|s| s.to_string());
+            let client_id = o
+                .get("clientId")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            let client_secret = o
+                .get("clientSecret")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            let scope = o
+                .get("scope")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
             if client_id.is_some() || client_secret.is_some() || scope.is_some() {
-                Some(McpOAuthConfig { client_id, client_secret, scope })
+                Some(McpOAuthConfig {
+                    client_id,
+                    client_secret,
+                    scope,
+                })
             } else {
                 None
             }
@@ -587,8 +601,14 @@ impl McpServer {
             None
         };
 
-        let timeout = json.get("timeout").and_then(|v| v.as_u64()).map(|v| v as u32);
-        let enabled = json.get("enabled").and_then(|v| v.as_bool()).unwrap_or(true);
+        let timeout = json
+            .get("timeout")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as u32);
+        let enabled = json
+            .get("enabled")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
 
         Ok(Self {
             server_type: McpServerType::Remote,
@@ -623,7 +643,11 @@ impl McpServer {
     }
 
     /// 创建远程 MCP 服务器
-    pub fn new_remote(url: String, headers: HashMap<String, String>, oauth: Option<McpOAuthConfig>) -> Self {
+    pub fn new_remote(
+        url: String,
+        headers: HashMap<String, String>,
+        oauth: Option<McpOAuthConfig>,
+    ) -> Self {
         Self {
             server_type: McpServerType::Remote,
             enabled: true,
@@ -646,38 +670,12 @@ impl McpServer {
         self.metadata.updated_at = default_timestamp();
     }
 
-    /// 获取显示用的类型名称
+    /// 获取显示用的类型名称（本地/远程）
     pub fn type_display(&self) -> &'static str {
         match self.server_type {
             McpServerType::Local => "本地",
             McpServerType::Remote => "远程",
         }
-    }
-
-    /// 获取摘要信息（用于列表显示）
-    pub fn summary(&self) -> String {
-        match self.server_type {
-            McpServerType::Local => {
-                self.command
-                    .as_ref()
-                    .and_then(|c| c.first())
-                    .cloned()
-                    .unwrap_or_else(|| "未配置命令".to_string())
-            }
-            McpServerType::Remote => {
-                self.url
-                    .as_ref()
-                    .cloned()
-                    .unwrap_or_else(|| "未配置 URL".to_string())
-            }
-        }
-    }
-
-    /// 检查是否配置了 OAuth
-    pub fn has_oauth(&self) -> bool {
-        self.oauth.as_ref().map_or(false, |o| {
-            o.client_id.is_some() || o.client_secret.is_some()
-        })
     }
 }
 
@@ -716,7 +714,11 @@ mod tests {
     #[test]
     fn test_mcp_local_server() {
         let server = McpServer::new_local(
-            vec!["npx".to_string(), "-y".to_string(), "test-server".to_string()],
+            vec![
+                "npx".to_string(),
+                "-y".to_string(),
+                "test-server".to_string(),
+            ],
             HashMap::new(),
         );
         assert_eq!(server.server_type, McpServerType::Local);
@@ -727,11 +729,8 @@ mod tests {
 
     #[test]
     fn test_mcp_remote_server() {
-        let server = McpServer::new_remote(
-            "https://mcp.example.com".to_string(),
-            HashMap::new(),
-            None,
-        );
+        let server =
+            McpServer::new_remote("https://mcp.example.com".to_string(), HashMap::new(), None);
         assert_eq!(server.server_type, McpServerType::Remote);
         assert!(server.enabled);
         assert!(server.url.is_some());

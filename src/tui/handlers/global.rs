@@ -151,6 +151,22 @@ fn handle_apply_scope_dialog(app: &mut App, key: KeyEvent) -> bool {
             app.apply_scope_dialog.toggle_option();
             true
         }
+        KeyCode::Down | KeyCode::Char('j') => {
+            app.apply_scope_dialog.selected_option =
+                (app.apply_scope_dialog.selected_option + 1) % 3;
+            app.apply_scope_dialog.update_state_from_option();
+            true
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.apply_scope_dialog.selected_option = if app.apply_scope_dialog.selected_option == 0
+            {
+                2
+            } else {
+                app.apply_scope_dialog.selected_option - 1
+            };
+            app.apply_scope_dialog.update_state_from_option();
+            true
+        }
         KeyCode::Enter => {
             app.execute_apply_config();
             true
@@ -463,55 +479,42 @@ fn handle_model_delete_dialog(app: &mut App, key: KeyEvent) -> bool {
 fn fetch_site_models_sync(app: &mut App, base_url: &str, api_key: &str) {
     use crate::config::Detector;
     use crate::config::SiteDetectionResult;
-    use std::panic;
-    use tokio::runtime::Handle;
+    use tokio::runtime::{Builder, Runtime};
 
     let base_url = base_url.to_string();
     let api_key = api_key.to_string();
 
-    // 使用 catch_unwind 捕获潜在的 panic
-    let fetch_result: Result<SiteDetectionResult, String> = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-        // 使用当前 tokio runtime 的 handle 来执行异步任务
-        match Handle::try_current() {
-            Ok(handle) => {
-                // 如果已经在 tokio runtime 中，使用 block_in_place
-                Ok(tokio::task::block_in_place(|| {
-                    handle.block_on(async {
-                        let detector = Detector::new();
-                        detector.detect_site(&base_url, &api_key).await
-                    })
-                }))
-            }
-            Err(_) => {
-                // 如果没有 runtime，创建一个新的
-                let rt = tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .map_err(|e| format!("运行时错误: {}", e))?;
-
-                Ok(rt.block_on(async {
-                    let detector = Detector::new();
-                    detector.detect_site(&base_url, &api_key).await
-                }))
-            }
-        }
-    }))
+    let runtime_result: Result<Runtime, String> = std::panic::catch_unwind(|| {
+        Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|e| format!("运行时创建失败: {}", e))
+    })
     .map_err(|_| "获取模型时发生错误".to_string())
     .and_then(|r| r);
 
-    match fetch_result {
-        Ok(result) => {
-            if result.is_available && !result.available_models.is_empty() {
-                app.set_fetched_models(result.available_models);
-            } else if let Some(error) = result.error_message {
-                app.set_fetch_models_error(error);
-            } else {
-                app.set_fetch_models_error("站点不可用或无法获取模型列表".to_string());
-            }
-        }
-        Err(e) => {
-            app.set_fetch_models_error(e);
-        }
+    let fetch_result = match runtime_result {
+        Ok(rt) => rt.block_on(async {
+            let detector = Detector::new();
+            detector.detect_site(&base_url, &api_key).await
+        }),
+        Err(_) => SiteDetectionResult {
+            detected_at: chrono::Utc::now().to_rfc3339(),
+            is_available: false,
+            api_key_valid: false,
+            available_models: Vec::new(),
+            response_time_ms: None,
+            error_message: Some("获取模型时发生错误".to_string()),
+        },
+    };
+
+    let result = fetch_result;
+    if result.is_available && !result.available_models.is_empty() {
+        app.set_fetched_models(result.available_models);
+    } else if let Some(error) = result.error_message {
+        app.set_fetch_models_error(error);
+    } else {
+        app.set_fetch_models_error("站点不可用或无法获取模型列表".to_string());
     }
 }
 

@@ -3,10 +3,13 @@
 use ratatui::widgets::ListState;
 
 use crate::config::ConfigManager;
+use crate::error::CliError;
 
 use super::{
     types::{AppTab, InputMode, LogEntry, MessageType, StatusMessage},
-    ui::components::{ApplyScopeDialog, ConfirmDialog, FormField, InputForm, McpServerForm, MultiSelectDialog},
+    ui::components::{
+        ApplyScopeDialog, ConfirmDialog, FormField, InputForm, McpServerForm, MultiSelectDialog,
+    },
 };
 
 /// Provider 表单类型
@@ -15,7 +18,6 @@ pub enum ProviderFormMode {
     Add,
     Edit,
 }
-
 
 /// TUI 应用状态
 pub struct App {
@@ -102,7 +104,7 @@ pub struct App {
 
 impl App {
     /// 创建新的 App 实例
-    pub fn new() -> Result<Self, String> {
+    pub fn new() -> Result<Self, CliError> {
         let config_manager = ConfigManager::new()?;
 
         // 获取 Provider 列表并排序（保持稳定顺序）
@@ -122,8 +124,17 @@ impl App {
 
         // 创建 Provider 表单
         let provider_form = InputForm::new("添加 Provider")
-            .add_field(FormField::new("名称").placeholder("provider-name").required())
-            .add_field(FormField::new("API Key").placeholder("sk-xxx...").password().required())
+            .add_field(
+                FormField::new("名称")
+                    .placeholder("provider-name")
+                    .required(),
+            )
+            .add_field(
+                FormField::new("API Key")
+                    .placeholder("sk-xxx...")
+                    .password()
+                    .required(),
+            )
             .add_field(FormField::new("Base URL").placeholder("https://api.example.com/v1"));
 
         // 创建 Model 表单
@@ -242,7 +253,8 @@ impl App {
             self.model_list_state.select(None);
         } else if let Some(i) = self.provider_list_state.selected() {
             if i >= self.providers.len() {
-                self.provider_list_state.select(Some(self.providers.len() - 1));
+                self.provider_list_state
+                    .select(Some(self.providers.len() - 1));
             }
             // 刷新当前选中 Provider 的 Model 列表
             self.refresh_models();
@@ -372,7 +384,8 @@ impl App {
     /// 打开编辑 Provider 表单
     pub fn open_edit_provider_form(&mut self) {
         if let Some(provider_name) = self.get_selected_provider().cloned() {
-            if let Ok(Some(provider)) = self.config_manager.opencode().get_provider(&provider_name) {
+            if let Ok(Some(provider)) = self.config_manager.opencode().get_provider(&provider_name)
+            {
                 self.provider_form.clear();
                 self.provider_form.title = format!("编辑 Provider: {}", provider_name);
                 self.provider_form_mode = ProviderFormMode::Edit;
@@ -426,7 +439,10 @@ impl App {
                 if let Some(old_name) = self.get_selected_provider().cloned() {
                     if old_name != name {
                         // 名称变化：删除旧的，创建新的
-                        let _ = self.config_manager.opencode_mut().delete_provider(&old_name);
+                        let _ = self
+                            .config_manager
+                            .opencode_mut()
+                            .delete_provider(&old_name);
                         self.config_manager.opencode_mut().add_provider(
                             name.clone(),
                             base_url,
@@ -452,9 +468,16 @@ impl App {
 
         match result {
             Ok(_) => {
-                let action = if self.provider_form_mode == ProviderFormMode::Add { "添加" } else { "更新" };
+                let action = if self.provider_form_mode == ProviderFormMode::Add {
+                    "添加"
+                } else {
+                    "更新"
+                };
                 self.show_success(&format!("Provider {} 成功: {}", action, name));
-                self.log_operation(format!("Provider {} 成功: {}", action, name), MessageType::Success);
+                self.log_operation(
+                    format!("Provider {} 成功: {}", action, name),
+                    MessageType::Success,
+                );
                 let _ = self.refresh_providers();
                 self.close_provider_form();
             }
@@ -469,7 +492,8 @@ impl App {
     /// 打开删除确认对话框
     pub fn open_delete_dialog(&mut self) {
         if let Some(name) = self.get_selected_provider() {
-            self.delete_dialog.message = format!("确定要删除 Provider \"{}\" 吗？\n此操作无法撤销。", name);
+            self.delete_dialog.message =
+                format!("确定要删除 Provider \"{}\" 吗？\n此操作无法撤销。", name);
             self.delete_dialog.show();
         }
     }
@@ -487,7 +511,8 @@ impl App {
                         self.provider_list_state.select(None);
                     } else if let Some(i) = self.provider_list_state.selected() {
                         if i >= self.providers.len() {
-                            self.provider_list_state.select(Some(self.providers.len() - 1));
+                            self.provider_list_state
+                                .select(Some(self.providers.len() - 1));
                         }
                     }
                 }
@@ -516,10 +541,16 @@ impl App {
     /// 确认应用配置
     pub fn confirm_apply_provider(&mut self) {
         if let Some(name) = self.get_selected_provider().cloned() {
-            match self.config_manager.apply_multiple_opencode_to_project(&vec![name.clone()]) {
+            match self
+                .config_manager
+                .apply_multiple_opencode_to_project(&vec![name.clone()])
+            {
                 Ok(_) => {
                     self.show_success(&format!("配置已应用: {}", name));
-                    self.log_operation(format!("应用 Provider 配置: {}", name), MessageType::Success);
+                    self.log_operation(
+                        format!("应用 Provider 配置: {}", name),
+                        MessageType::Success,
+                    );
                 }
                 Err(e) => {
                     self.show_error(&format!("应用配置失败: {}", e));
@@ -616,7 +647,8 @@ impl App {
             return;
         }
         // 显示所有选中的 Provider
-        self.apply_scope_dialog.show_multiple(&self.selected_providers);
+        self.apply_scope_dialog
+            .show_multiple(&self.selected_providers);
         self.is_multi_apply_mode = false;
     }
 
@@ -848,10 +880,15 @@ impl App {
 
     /// 确认删除 Model
     pub fn confirm_delete_model(&mut self) {
-        if let (Some(provider_name), Some(model_name)) =
-            (self.get_selected_provider().cloned(), self.get_selected_model().cloned())
-        {
-            match self.config_manager.opencode_mut().delete_model(&provider_name, &model_name) {
+        if let (Some(provider_name), Some(model_name)) = (
+            self.get_selected_provider().cloned(),
+            self.get_selected_model().cloned(),
+        ) {
+            match self
+                .config_manager
+                .opencode_mut()
+                .delete_model(&provider_name, &model_name)
+            {
                 Ok(_) => {
                     self.show_success(&format!("Model 已删除: {}", model_name));
                     self.log_operation(format!("删除 Model: {}", model_name), MessageType::Success);
@@ -883,7 +920,8 @@ impl App {
             let api_key = provider.options.api_key.clone();
 
             // 显示加载状态
-            self.model_select_dialog.show_loading("正在获取站点可用模型列表...");
+            self.model_select_dialog
+                .show_loading("正在获取站点可用模型列表...");
 
             // 预选已有的模型
             self.model_select_dialog.set_selected(&self.models);
@@ -1144,13 +1182,23 @@ impl App {
         }
 
         // 直接保存用户原始 JSON 配置
-        let result = self.config_manager.mcp_mut().save_raw_json(&name, &config_json);
+        let result = self
+            .config_manager
+            .mcp_mut()
+            .save_raw_json(&name, &config_json);
 
         match result {
             Ok(_) => {
-                let action = if self.mcp_form.is_edit_mode { "更新" } else { "添加" };
+                let action = if self.mcp_form.is_edit_mode {
+                    "更新"
+                } else {
+                    "添加"
+                };
                 self.show_success(&format!("MCP 服务器 {} 成功: {}", action, name));
-                self.log_operation(format!("MCP 服务器 {} 成功: {}", action, name), MessageType::Success);
+                self.log_operation(
+                    format!("MCP 服务器 {} 成功: {}", action, name),
+                    MessageType::Success,
+                );
                 self.refresh_mcp_servers();
                 self.close_mcp_form();
             }
@@ -1163,7 +1211,8 @@ impl App {
     /// 打开 MCP 删除对话框
     pub fn open_mcp_delete_dialog(&mut self) {
         if let Some(name) = self.get_selected_mcp_server() {
-            self.mcp_delete_dialog.message = format!("确定要删除 MCP 服务器 \"{}\" 吗？\n此操作无法撤销。", name);
+            self.mcp_delete_dialog.message =
+                format!("确定要删除 MCP 服务器 \"{}\" 吗？\n此操作无法撤销。", name);
             self.mcp_delete_dialog.show();
         }
     }
@@ -1192,7 +1241,10 @@ impl App {
                 Ok(new_state) => {
                     let status = if new_state { "启用" } else { "禁用" };
                     self.show_success(&format!("MCP 服务器已{}: {}", status, name));
-                    self.log_operation(format!("{}MCP 服务器: {}", status, name), MessageType::Info);
+                    self.log_operation(
+                        format!("{}MCP 服务器: {}", status, name),
+                        MessageType::Info,
+                    );
                     self.refresh_mcp_servers();
                 }
                 Err(e) => {
@@ -1282,7 +1334,8 @@ impl App {
             // 空选择 = 清空 MCP 配置
             self.mcp_apply_scope_dialog.show_clear_mcp();
         } else {
-            self.mcp_apply_scope_dialog.show_multiple(&self.selected_mcp_servers);
+            self.mcp_apply_scope_dialog
+                .show_multiple(&self.selected_mcp_servers);
         }
         self.is_mcp_multi_sync_mode = false;
     }
@@ -1299,7 +1352,11 @@ impl App {
         // 同步到全局
         if apply_to_global {
             // 空列表会清空 mcp 配置
-            match self.config_manager.mcp().sync_to_opencode(Some(&server_names)) {
+            match self
+                .config_manager
+                .mcp()
+                .sync_to_opencode(Some(&server_names))
+            {
                 Ok(_) => {
                     if is_clear_mode {
                         self.show_success("已清空全局 MCP 配置");
@@ -1318,7 +1375,11 @@ impl App {
 
         // 同步到项目
         if apply_to_project {
-            match self.config_manager.mcp().sync_to_project(Some(&server_names)) {
+            match self
+                .config_manager
+                .mcp()
+                .sync_to_project(Some(&server_names))
+            {
                 Ok(_) => {
                     if is_clear_mode {
                         self.show_success("已清空项目 MCP 配置");

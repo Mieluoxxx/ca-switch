@@ -5,15 +5,20 @@
 pub enum AppTab {
     #[default]
     Providers, // Provider + Model 管理（合并后）
-    Mcp,       // MCP 服务器管理
-    Backup,    // 备份恢复
-    Status,    // 状态监控
+    Mcp,    // MCP 服务器管理
+    Backup, // 备份恢复
+    Status, // 状态监控
 }
 
 impl AppTab {
     /// 获取所有 Tab
     pub fn all() -> &'static [AppTab] {
-        &[AppTab::Providers, AppTab::Mcp, AppTab::Backup, AppTab::Status]
+        &[
+            AppTab::Providers,
+            AppTab::Mcp,
+            AppTab::Backup,
+            AppTab::Status,
+        ]
     }
 
     /// 获取 Tab 标题
@@ -61,7 +66,7 @@ impl AppTab {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum InputMode {
     #[default]
-    Normal,  // 正常导航模式
+    Normal, // 正常导航模式
     Editing, // 编辑/输入模式
 }
 

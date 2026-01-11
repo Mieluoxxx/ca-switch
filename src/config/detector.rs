@@ -38,11 +38,7 @@ impl Detector {
     // ========== 站点检测 ==========
 
     /// 完整的站点检测
-    pub async fn detect_site(
-        &self,
-        base_url: &str,
-        api_key: &str,
-    ) -> SiteDetectionResult {
+    pub async fn detect_site(&self, base_url: &str, api_key: &str) -> SiteDetectionResult {
         let start = Instant::now();
         let mut result = SiteDetectionResult {
             detected_at: chrono::Utc::now().to_rfc3339(),
