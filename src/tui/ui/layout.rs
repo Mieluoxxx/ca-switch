@@ -687,10 +687,7 @@ fn render_mcp_multi_sync_mode(frame: &mut Frame, app: &mut App, theme: &Theme, a
                 "○ 未选择"
             };
 
-            let type_str = match server.server_type {
-                crate::config::models::McpServerType::Local => "本地",
-                crate::config::models::McpServerType::Remote => "远程",
-            };
+            let type_str = server.type_display();
 
             let details = vec![
                 Line::from(vec![
@@ -734,10 +731,14 @@ fn render_mcp_detail_panel(frame: &mut Frame, app: &App, theme: &Theme, area: Re
 
     if let Some(server_name) = app.get_selected_mcp_server() {
         if let Ok(Some(server)) = app.config_manager.mcp().get_server(server_name) {
-            let type_str = match server.server_type {
-                crate::config::models::McpServerType::Local => "本地 📦",
-                crate::config::models::McpServerType::Remote => "远程 🌐",
-            };
+            let type_str = format!(
+                "{} {}",
+                server.type_display(),
+                match server.server_type {
+                    crate::config::models::McpServerType::Local => "📦",
+                    crate::config::models::McpServerType::Remote => "🌐",
+                }
+            );
 
             let status_str = if server.enabled {
                 "✓ 已启用"

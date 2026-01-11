@@ -1,15 +1,12 @@
 // 全局键盘事件处理器
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use tokio::runtime::Runtime;
 
 use crate::tui::{
     app::App,
     types::{AppTab, InputMode},
     ui::DialogResult,
 };
-
-struct RuntimeWrapper(Runtime);
 
 /// 处理键盘事件
 /// 返回 true 表示事件已处理
@@ -466,23 +463,22 @@ fn handle_model_delete_dialog(app: &mut App, key: KeyEvent) -> bool {
 fn fetch_site_models_sync(app: &mut App, base_url: &str, api_key: &str) {
     use crate::config::Detector;
     use crate::config::SiteDetectionResult;
-    use tokio::runtime::Builder;
+    use tokio::runtime::{Builder, Runtime};
 
     let base_url = base_url.to_string();
     let api_key = api_key.to_string();
 
-    let runtime_result: Result<RuntimeWrapper, String> = std::panic::catch_unwind(|| {
-        let rt = Builder::new_current_thread()
+    let runtime_result: Result<Runtime, String> = std::panic::catch_unwind(|| {
+        Builder::new_current_thread()
             .enable_all()
             .build()
-            .map_err(|e| format!("运行时创建失败: {}", e))?;
-        Ok(RuntimeWrapper(rt))
+            .map_err(|e| format!("运行时创建失败: {}", e))
     })
     .map_err(|_| "获取模型时发生错误".to_string())
     .and_then(|r| r);
 
     let fetch_result = match runtime_result {
-        Ok(wrapper) => wrapper.0.block_on(async {
+        Ok(rt) => rt.block_on(async {
             let detector = Detector::new();
             detector.detect_site(&base_url, &api_key).await
         }),
