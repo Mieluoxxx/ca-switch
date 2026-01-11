@@ -9,6 +9,7 @@ pub mod opencode_manager;
 
 pub use thiserror::Error;
 
+#[allow(dead_code)]
 #[derive(Error, Debug)]
 pub enum ConfigError {
     #[error("文件读写错误: {source}")]

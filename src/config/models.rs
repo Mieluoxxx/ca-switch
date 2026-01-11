@@ -460,7 +460,6 @@ pub struct McpServerMetadata {
 // MCP 实现方法
 // ============================================================================
 
-#[allow(dead_code)]
 impl McpConfig {
     /// 创建新的 MCP 配置
     pub fn new() -> Self {
@@ -475,19 +474,9 @@ impl McpConfig {
         self.servers.get(name)
     }
 
-    /// 获取可变服务器
-    pub fn get_server_mut(&mut self, name: &str) -> Option<&mut McpServer> {
-        self.servers.get_mut(name)
-    }
-
     /// 添加服务器
     pub fn add_server(&mut self, name: String, server: McpServer) {
         self.servers.insert(name, server);
-    }
-
-    /// 删除服务器
-    pub fn remove_server(&mut self, name: &str) -> Option<McpServer> {
-        self.servers.remove(name)
     }
 
     /// 获取按名称排序的服务器列表
@@ -504,7 +493,6 @@ impl Default for McpConfig {
     }
 }
 
-#[allow(dead_code)]
 impl McpServer {
     /// 从 JSON Value 解析创建 McpServer
     /// 支持两种格式：
@@ -682,36 +670,12 @@ impl McpServer {
         self.metadata.updated_at = default_timestamp();
     }
 
-    /// 获取显示用的类型名称
+    /// 获取显示用的类型名称（本地/远程）
     pub fn type_display(&self) -> &'static str {
         match self.server_type {
             McpServerType::Local => "本地",
             McpServerType::Remote => "远程",
         }
-    }
-
-    /// 获取摘要信息（用于列表显示）
-    pub fn summary(&self) -> String {
-        match self.server_type {
-            McpServerType::Local => self
-                .command
-                .as_ref()
-                .and_then(|c| c.first())
-                .cloned()
-                .unwrap_or_else(|| "未配置命令".to_string()),
-            McpServerType::Remote => self
-                .url
-                .as_ref()
-                .cloned()
-                .unwrap_or_else(|| "未配置 URL".to_string()),
-        }
-    }
-
-    /// 检查是否配置了 OAuth
-    pub fn has_oauth(&self) -> bool {
-        self.oauth.as_ref().map_or(false, |o| {
-            o.client_id.is_some() || o.client_secret.is_some()
-        })
     }
 }
 

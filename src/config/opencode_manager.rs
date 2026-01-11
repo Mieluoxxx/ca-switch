@@ -4,6 +4,7 @@
 use crate::config::models::{
     OpenCodeActiveConfig, OpenCodeConfig, OpenCodeModelInfo, OpenCodeProvider,
 };
+use crate::config::ConfigError;
 use serde_json;
 use std::collections::HashMap;
 use std::fs;
@@ -18,17 +19,19 @@ pub struct OpenCodeConfigManager {
 
 impl OpenCodeConfigManager {
     /// 创建新的 OpenCode 配置管理器
-    pub fn new(config_dir: PathBuf) -> Result<Self, String> {
+    pub fn new(config_dir: PathBuf) -> Result<Self, ConfigError> {
         // 确保 ~/.opcd 目录存在
         if !config_dir.exists() {
-            fs::create_dir_all(&config_dir).map_err(|e| format!("创建配置目录失败: {}", e))?;
+            fs::create_dir_all(&config_dir)?;
         }
 
         let opencode_config_file = config_dir.join("opencode.json");
 
         // OpenCode 官方配置目录
         let opencode_dir = dirs::home_dir()
-            .ok_or("无法获取用户主目录")?
+            .ok_or_else(|| ConfigError::NotFound {
+                name: "用户主目录".to_string(),
+            })?
             .join(".opencode");
 
         let opencode_json = opencode_dir.join("opencode.json");

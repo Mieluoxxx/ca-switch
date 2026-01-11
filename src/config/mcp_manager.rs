@@ -2,6 +2,7 @@
 // 负责管理 ~/.opcd/mcp/ 目录下的多个 JSON 文件，并同步到 opencode.json
 
 use crate::config::models::{McpConfig, McpOAuthConfig, McpServer, McpServerType};
+use crate::config::ConfigError;
 use serde_json;
 use std::collections::HashMap;
 use std::fs;
@@ -18,16 +19,18 @@ pub struct McpConfigManager {
 #[allow(dead_code)]
 impl McpConfigManager {
     /// 创建新的 MCP 配置管理器
-    pub fn new(config_dir: PathBuf) -> Result<Self, String> {
+    pub fn new(config_dir: PathBuf) -> Result<Self, ConfigError> {
         let mcp_dir = config_dir.join("mcp");
 
         // 确保 mcp 目录存在
         if !mcp_dir.exists() {
-            fs::create_dir_all(&mcp_dir).map_err(|e| format!("创建 mcp 目录失败: {}", e))?;
+            fs::create_dir_all(&mcp_dir)?;
         }
 
         let opencode_dir = dirs::home_dir()
-            .ok_or("无法获取用户主目录")?
+            .ok_or_else(|| ConfigError::NotFound {
+                name: "用户主目录".to_string(),
+            })?
             .join(".opencode");
 
         let opencode_json = opencode_dir.join("opencode.json");
