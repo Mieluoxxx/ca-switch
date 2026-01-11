@@ -145,18 +145,18 @@ impl ApplyScopeDialog {
 
     /// 根据当前 selected_option 的值更新 apply_to_global 和 apply_to_project 状态
     ///
-    /// - selected_option = 0: 仅全局配置 (apply_to_global=true, apply_to_project=false)
-    /// - selected_option = 1: 仅项目配置 (apply_to_global=false, apply_to_project=true)
+    /// - selected_option = 0: 仅项目配置 (apply_to_global=false, apply_to_project=true)
+    /// - selected_option = 1: 仅全局配置 (apply_to_global=true, apply_to_project=false)
     /// - selected_option = 2: 两者都应用 (apply_to_global=true, apply_to_project=true)
     pub fn update_state_from_option(&mut self) {
         match self.selected_option {
             0 => {
-                self.apply_to_global = true;
-                self.apply_to_project = false;
-            }
-            1 => {
                 self.apply_to_global = false;
                 self.apply_to_project = true;
+            }
+            1 => {
+                self.apply_to_global = true;
+                self.apply_to_project = false;
             }
             2 => {
                 self.apply_to_global = true;
@@ -264,11 +264,6 @@ impl ApplyScopeDialog {
         let truncated_path = truncate_path(&project_path, 30);
 
         let opt1 = if self.selected_option == 0 {
-            Span::styled("▶ 全局配置 ~/.opencode/", selected_style)
-        } else {
-            Span::styled("  全局配置 ~/.opencode/", option_style)
-        };
-        let opt2 = if self.selected_option == 1 {
             Span::styled(
                 format!("▶ 当前项目 {}/.opencode/", truncated_path),
                 selected_style,
@@ -278,6 +273,11 @@ impl ApplyScopeDialog {
                 format!("  当前项目 {}/.opencode/", truncated_path),
                 option_style,
             )
+        };
+        let opt2 = if self.selected_option == 1 {
+            Span::styled("▶ 全局配置 ~/.opencode/", selected_style)
+        } else {
+            Span::styled("  全局配置 ~/.opencode/", option_style)
         };
         let opt3 = if self.selected_option == 2 {
             Span::styled("▶ 两者都应用", selected_style)

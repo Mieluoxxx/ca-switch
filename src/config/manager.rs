@@ -105,13 +105,12 @@ impl ConfigManager {
         }
     }
 
-    /// 应用多个 OpenCode Provider 配置到全局
-    pub fn apply_multiple_opencode_to_global(
-        &mut self,
+    /// 验证所有 Provider 是否存在
+    fn validate_providers_exist(
+        &self,
         provider_names: &[String],
+        opencode_config: &crate::config::models::OpenCodeConfig,
     ) -> Result<(), ConfigError> {
-        let opencode_config = self.opencode_manager.read_config()?;
-
         for provider_name in provider_names {
             if opencode_config.get_provider(provider_name).is_none() {
                 return Err(ConfigError::NotFound {
@@ -119,6 +118,16 @@ impl ConfigManager {
                 });
             }
         }
+        Ok(())
+    }
+
+    /// 应用多个 OpenCode Provider 配置到全局
+    pub fn apply_multiple_opencode_to_global(
+        &mut self,
+        provider_names: &[String],
+    ) -> Result<(), ConfigError> {
+        let opencode_config = self.opencode_manager.read_config()?;
+        self.validate_providers_exist(provider_names, &opencode_config)?;
 
         if let Some(first_provider) = provider_names.first() {
             let reference = OpenCodeActiveReference {
@@ -143,16 +152,8 @@ impl ConfigManager {
         provider_names: &[String],
     ) -> Result<(), ConfigError> {
         let opencode_config = self.opencode_manager.read_config()?;
+        self.validate_providers_exist(provider_names, &opencode_config)?;
 
-        for provider_name in provider_names {
-            if opencode_config.get_provider(provider_name).is_none() {
-                return Err(ConfigError::NotFound {
-                    name: format!("Provider '{}'", provider_name),
-                });
-            }
-        }
-
-        // 2. 同步所有Provider到项目 .opencode/
         self.opencode_manager
             .sync_multiple_providers_to_project(provider_names)?;
 

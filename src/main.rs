@@ -7,7 +7,11 @@ mod utils;
 
 use clap::Parser;
 use cli::{Cli, Commands, ExportType};
+use console::style;
 use error::Result;
+
+use crate::config::ConfigManager;
+use crate::utils::{show_error, show_info, show_success};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -36,10 +40,6 @@ async fn main() -> Result<()> {
 
 /// 显示状态
 fn show_status() -> Result<()> {
-    use config::ConfigManager;
-    use console::style;
-    use utils::show_info;
-
     println!("\n{}", style("📊 当前配置状态").cyan().bold());
     println!("{}", style("═".repeat(40)).dim());
 
@@ -76,9 +76,6 @@ fn show_status() -> Result<()> {
 
 /// 导出 OpenCode 配置到当前目录
 fn export_opencode_config() -> Result<()> {
-    use console::style;
-    use utils::{show_error, show_info, show_success};
-
     println!("\n{}", style("📤 导出 OpenCode 配置").cyan().bold());
     println!("{}", style("═".repeat(40)).dim());
     println!();
