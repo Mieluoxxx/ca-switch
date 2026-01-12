@@ -54,6 +54,8 @@ pub struct App {
     pub provider_form_mode: ProviderFormMode,
     /// Model 表单
     pub model_form: InputForm,
+    /// 编辑模式状态 (provider_name, model_name)
+    pub editing_model: Option<(String, String)>,
     /// 确认删除对话框
     pub delete_dialog: ConfirmDialog,
     /// 应用配置确认对话框
@@ -139,7 +141,9 @@ impl App {
 
         // 创建 Model 表单
         let model_form = InputForm::new("添加 Model")
-            .add_field(FormField::new("Model ID").placeholder("gpt-4o").required());
+            .add_field(FormField::new("Model ID").placeholder("gpt-4o").required())
+            .add_field(FormField::new("Context Limit").placeholder("可选，如 200000"))
+            .add_field(FormField::new("Output Limit").placeholder("可选，如 65536"));
 
         // 创建删除确认对话框
         let delete_dialog = ConfirmDialog::new("确认删除", "确定要删除这个 Provider 吗？")
@@ -203,6 +207,7 @@ impl App {
             provider_form,
             provider_form_mode: ProviderFormMode::Add,
             model_form,
+            editing_model: None,
             delete_dialog,
             apply_dialog,
             apply_scope_dialog,
@@ -444,15 +449,13 @@ impl App {
         let base_url = self.provider_form.get_value(2).unwrap_or("").to_string();
 
         let result = match self.provider_form_mode {
-            ProviderFormMode::Add => {
-                self.config_manager.opencode_mut().add_provider(
-                    name.clone(),
-                    base_url,
-                    api_key,
-                    None, // npm
-                    None, // description
-                )
-            }
+            ProviderFormMode::Add => self.config_manager.opencode_mut().add_provider(
+                name.clone(),
+                base_url,
+                api_key,
+                Some("@ai-sdk/openai-compatible".to_string()),
+                None,
+            ),
             ProviderFormMode::Edit => {
                 // 编辑模式：更新现有 Provider 的元数据
                 if let Some(old_name) = self.get_selected_provider().cloned() {
@@ -466,7 +469,7 @@ impl App {
                             name.clone(),
                             base_url,
                             api_key,
-                            None,
+                            Some("@ai-sdk/openai-compatible".to_string()),
                             None,
                         )
                     } else {
@@ -790,6 +793,7 @@ impl App {
     /// 关闭 Model 表单
     pub fn close_model_form(&mut self) {
         self.model_form.hide();
+        self.editing_model = None;
         self.input_mode = InputMode::Normal;
     }
 
@@ -800,13 +804,32 @@ impl App {
             return;
         }
 
-        let model_id = self.model_form.get_value(0).unwrap_or("").to_string();
+        let values = self.model_form.get_values();
+        let model_id = values[0].to_string();
+        let context_str = values[1].trim();
+        let output_str = values[2].trim();
+
+        let limit = if context_str.is_empty() && output_str.is_empty() {
+            None
+        } else {
+            Some(crate::config::models::OpenCodeModelLimit {
+                context: if context_str.is_empty() {
+                    None
+                } else {
+                    context_str.parse().ok()
+                },
+                output: if output_str.is_empty() {
+                    None
+                } else {
+                    output_str.parse().ok()
+                },
+            })
+        };
 
         if let Some(provider_name) = self.get_selected_provider().cloned() {
-            // 创建 ModelInfo
             let model_info = crate::config::models::OpenCodeModelInfo {
                 name: model_id.clone(),
-                limit: None,
+                limit,
                 model_detection: None,
             };
 
@@ -826,6 +849,104 @@ impl App {
                 Err(e) => {
                     self.show_error(&format!("添加失败: {}", e));
                 }
+            }
+        }
+    }
+
+    /// 打开编辑 Model 表单
+    pub fn open_edit_model_form(&mut self) {
+        let (Some(provider_name), Some(model_name)) = (
+            self.get_selected_provider().cloned(),
+            self.get_selected_model().cloned(),
+        ) else {
+            self.show_error("请先选择一个 Provider 和 Model");
+            return;
+        };
+
+        if let Ok(Some(provider)) = self.config_manager.opencode().get_provider(&provider_name) {
+            if let Some(model_info) = provider.models.get(&model_name) {
+                self.editing_model = Some((provider_name.clone(), model_name.clone()));
+                self.model_form.clear();
+                self.model_form.title = "编辑 Model".to_string();
+
+                self.model_form.set_field_value(0, &model_name);
+
+                if let Some(ref limit) = model_info.limit {
+                    if let Some(ctx) = limit.context {
+                        self.model_form.set_field_value(1, &ctx.to_string());
+                    }
+                    if let Some(out) = limit.output {
+                        self.model_form.set_field_value(2, &out.to_string());
+                    }
+                }
+
+                self.model_form.show();
+                self.input_mode = InputMode::Editing;
+            } else {
+                self.show_error(&format!("Model '{}' 不存在", model_name));
+            }
+        } else {
+            self.show_error(&format!("Provider '{}' 不存在", provider_name));
+        }
+    }
+
+    /// 提交编辑 Model 表单
+    pub fn submit_edit_model_form(&mut self) {
+        if !self.model_form.is_valid() {
+            self.show_error("请填写 Model ID");
+            return;
+        }
+
+        let (provider_name, old_model_name) = match self.editing_model.take() {
+            Some(pair) => pair,
+            None => {
+                self.show_error("编辑状态异常");
+                return;
+            }
+        };
+
+        let values = self.model_form.get_values();
+        let model_id = values[0].to_string();
+        let context_str = values[1].trim();
+        let output_str = values[2].trim();
+
+        let limit = if context_str.is_empty() && output_str.is_empty() {
+            None
+        } else {
+            Some(crate::config::models::OpenCodeModelLimit {
+                context: if context_str.is_empty() {
+                    None
+                } else {
+                    context_str.parse().ok()
+                },
+                output: if output_str.is_empty() {
+                    None
+                } else {
+                    output_str.parse().ok()
+                },
+            })
+        };
+
+        let model_info = crate::config::models::OpenCodeModelInfo {
+            name: model_id.clone(),
+            limit,
+            model_detection: None,
+        };
+
+        match self.config_manager.opencode_mut().update_model(
+            &provider_name,
+            model_id.clone(),
+            model_info,
+        ) {
+            Ok(_) => {
+                self.show_success(&format!("Model 更新成功: {}", model_id));
+                self.log_operation(format!("更新 Model: {}", model_id), MessageType::Success);
+                self.refresh_models();
+                self.close_model_form();
+            }
+            Err(e) => {
+                self.show_error(&format!("更新失败: {}", e));
+                self.editing_model = Some((provider_name, old_model_name));
             }
         }
     }

@@ -166,6 +166,23 @@ impl OpenCodeConfigManager {
         self.write_config(&config)
     }
 
+    pub fn update_model(
+        &mut self,
+        provider_name: &str,
+        model_id: String,
+        model_info: crate::config::models::OpenCodeModelInfo,
+    ) -> Result<(), String> {
+        let mut config = self.read_config()?;
+
+        let provider = config
+            .get_provider_mut(provider_name)
+            .ok_or_else(|| format!("Provider '{}' 不存在", provider_name))?;
+
+        provider.update_model(&model_id, model_info)?;
+
+        self.write_config(&config)
+    }
+
     pub fn delete_model(&mut self, provider_name: &str, model_id: &str) -> Result<(), String> {
         let mut config = self.read_config()?;
 

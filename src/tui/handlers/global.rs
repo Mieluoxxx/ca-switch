@@ -321,10 +321,12 @@ fn handle_provider_tab_key(app: &mut App, key: KeyEvent) -> bool {
             }
             true
         }
-        // 编辑 Provider（仅在 Provider 焦点时）
+        // 编辑 Provider 或 Model
         KeyCode::Char('e') => {
             if app.provider_tab_focus == 0 {
                 app.open_edit_provider_form();
+            } else {
+                app.open_edit_model_form();
             }
             true
         }
@@ -411,11 +413,16 @@ fn handle_multi_apply_mode(app: &mut App, key: KeyEvent) -> bool {
 fn handle_model_form(app: &mut App, key: KeyEvent) -> bool {
     match key.code {
         KeyCode::Esc => {
+            app.editing_model = None;
             app.close_model_form();
             true
         }
         KeyCode::Enter => {
-            app.submit_model_form();
+            if app.editing_model.is_some() {
+                app.submit_edit_model_form();
+            } else {
+                app.submit_model_form();
+            }
             true
         }
         KeyCode::Tab => {
