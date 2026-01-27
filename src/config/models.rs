@@ -246,6 +246,20 @@ impl OpenCodeProvider {
         self.update_timestamp();
     }
 
+    /// 更新模型信息
+    pub fn update_model(
+        &mut self,
+        model_id: &str,
+        model_info: OpenCodeModelInfo,
+    ) -> Result<(), String> {
+        if !self.models.contains_key(model_id) {
+            return Err(format!("模型 '{}' 不存在", model_id));
+        }
+        self.models.insert(model_id.to_string(), model_info);
+        self.update_timestamp();
+        Ok(())
+    }
+
     /// 删除模型
     pub fn remove_model(&mut self, model_id: &str) -> Option<OpenCodeModelInfo> {
         let result = self.models.remove(model_id);

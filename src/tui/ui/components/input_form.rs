@@ -146,6 +146,16 @@ impl InputForm {
         self.fields.get(index).map(|f| f.value())
     }
 
+    pub fn get_values(&self) -> Vec<&str> {
+        self.fields.iter().map(|f| f.value()).collect()
+    }
+
+    pub fn set_field_value(&mut self, index: usize, value: &str) {
+        if let Some(field) = self.fields.get_mut(index) {
+            field.set_value(value);
+        }
+    }
+
     pub fn render(&self, frame: &mut Frame, theme: &Theme, area: Rect) {
         if !self.visible {
             return;

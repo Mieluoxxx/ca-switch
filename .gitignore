@@ -3,5 +3,7 @@ package.json
 bun.lock
 target/
 .opencode/opencode.json
+.opencode/opencode.json.bak
 Cargo.lock
 docs/
+.serena/
