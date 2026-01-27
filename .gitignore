@@ -6,3 +6,4 @@ target/
 .opencode/opencode.json.bak
 Cargo.lock
 docs/
+.serena/

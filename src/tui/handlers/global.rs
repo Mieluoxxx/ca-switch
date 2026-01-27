@@ -348,7 +348,7 @@ fn handle_provider_tab_key(app: &mut App, key: KeyEvent) -> bool {
         }
         // 获取站点模型（仅在 Model 焦点时）
         KeyCode::Char('t') => {
-            if app.provider_tab_focus == 1 || app.get_selected_provider().is_some() {
+            if app.provider_tab_focus == 1 {
                 if let Some((base_url, api_key)) = app.prepare_fetch_site_models() {
                     fetch_site_models_sync(app, &base_url, &api_key);
                 }
@@ -486,25 +486,34 @@ fn handle_model_delete_dialog(app: &mut App, key: KeyEvent) -> bool {
 fn fetch_site_models_sync(app: &mut App, base_url: &str, api_key: &str) {
     use crate::config::Detector;
     use crate::config::SiteDetectionResult;
-    use tokio::runtime::{Builder, Runtime};
 
     let base_url = base_url.to_string();
     let api_key = api_key.to_string();
 
-    let runtime_result: Result<Runtime, String> = std::panic::catch_unwind(|| {
-        Builder::new_current_thread()
+    // 在新线程中创建 tokio 运行时执行异步请求
+    let result = std::thread::spawn(move || -> Result<SiteDetectionResult, String> {
+        let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
-            .map_err(|e| format!("运行时创建失败: {}", e))
-    })
-    .map_err(|_| "获取模型时发生错误".to_string())
-    .and_then(|r| r);
+            .map_err(|e| format!("运行时创建失败: {}", e))?;
 
-    let fetch_result = match runtime_result {
-        Ok(rt) => rt.block_on(async {
+        Ok(rt.block_on(async {
             let detector = Detector::new();
             detector.detect_site(&base_url, &api_key).await
-        }),
+        }))
+    })
+    .join();
+
+    let fetch_result = match result {
+        Ok(Ok(result)) => result,
+        Ok(Err(e)) => SiteDetectionResult {
+            detected_at: chrono::Utc::now().to_rfc3339(),
+            is_available: false,
+            api_key_valid: false,
+            available_models: Vec::new(),
+            response_time_ms: None,
+            error_message: Some(e),
+        },
         Err(_) => SiteDetectionResult {
             detected_at: chrono::Utc::now().to_rfc3339(),
             is_available: false,
@@ -515,10 +524,9 @@ fn fetch_site_models_sync(app: &mut App, base_url: &str, api_key: &str) {
         },
     };
 
-    let result = fetch_result;
-    if result.is_available && !result.available_models.is_empty() {
-        app.set_fetched_models(result.available_models);
-    } else if let Some(error) = result.error_message {
+    if fetch_result.is_available && !fetch_result.available_models.is_empty() {
+        app.set_fetched_models(fetch_result.available_models);
+    } else if let Some(error) = fetch_result.error_message {
         app.set_fetch_models_error(error);
     } else {
         app.set_fetch_models_error("站点不可用或无法获取模型列表".to_string());

@@ -99,6 +99,10 @@ impl MultiSelectDialog {
     pub fn show_error(&mut self, message: &str) {
         self.loading = false;
         self.message = Some(message.to_string());
+        // 清空列表，避免显示旧数据
+        self.items.clear();
+        self.filtered_indices.clear();
+        self.selected.clear();
     }
 
     /// 隐藏对话框

@@ -1003,6 +1003,9 @@ impl App {
             let base_url = provider.options.base_url.clone();
             let api_key = provider.options.api_key.clone();
 
+            // 设置对话框标题为 Provider 名称
+            self.model_select_dialog.title = format!("站点模型 - {}", provider_name);
+
             // 显示加载状态
             self.model_select_dialog
                 .show_loading("正在获取站点可用模型列表...");
@@ -1019,20 +1022,16 @@ impl App {
 
     /// 设置获取到的站点模型列表
     pub fn set_fetched_models(&mut self, models: Vec<String>) {
-        // 过滤掉已添加的模型
-        let existing: std::collections::HashSet<_> = self.models.iter().collect();
-        let new_models: Vec<String> = models
-            .into_iter()
-            .filter(|m| !existing.contains(m))
-            .collect();
-
-        if new_models.is_empty() {
+        if models.is_empty() {
             self.model_select_dialog.hide();
-            self.show_info("所有可用模型都已添加");
+            self.show_info("站点没有可用模型");
             return;
         }
 
-        self.model_select_dialog.set_items(new_models);
+        // 设置完整的模型列表
+        self.model_select_dialog.set_items(models);
+        // 预选已添加的模型（显示为已勾选）
+        self.model_select_dialog.set_selected(&self.models);
         self.model_select_dialog.show();
     }
 
